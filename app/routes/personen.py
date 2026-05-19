@@ -14,6 +14,7 @@ Regeln:
 """
 
 import os
+import re
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -22,6 +23,21 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from app.db import get_connection, write_audit_log, now_iso
+
+# BUG-03: E-Mail-Format-Validierung (server-seitig)
+_EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _validate_email(email: Optional[str]) -> Optional[str]:
+    """Gibt None zurück wenn email leer, wirft ValueError bei ungültigem Format."""
+    if not email:
+        return None
+    cleaned = email.strip()
+    if not cleaned:
+        return None
+    if not _EMAIL_REGEX.match(cleaned):
+        raise ValueError(f"Ungültiges E-Mail-Format: {cleaned}")
+    return cleaned
 
 # ─── Router + Templates ───────────────────────────────────────────────────────
 router = APIRouter()
@@ -185,8 +201,16 @@ async def person_erstellen(
     user = get_user(request)
     ip = get_client_ip(request)
 
+    # BUG-03: E-Mail-Format-Validierung vor DB-Schreiben
+    try:
+        email = _validate_email(email)
+    except ValueError as ve:
+        return JSONResponse(
+            {"detail": [{"loc": ["body", "email"], "msg": str(ve), "type": "value_error"}]},
+            status_code=422
+        )
+
     # Normalisierung
-    email = email.strip() or None if email else None
     telefon = telefon.strip() or None if telefon else None
     position = position.strip() or None if position else None
     prospect_level = prospect_level or None
@@ -243,12 +267,12 @@ def person_detail(request: Request, person_id: int):
 
         person = dict(row)
 
-        # Verknüpfte Unternehmen
+        # Verknüpfte Unternehmen – BUG-01 Fix: nur nicht-gelöschte Firmen anzeigen
         verknuepfungen = conn.execute(
             """SELECT pu.unternehmen_id, pu.rolle, pu.primary_company, u.name
                FROM person_unternehmen pu
                JOIN unternehmen u ON u.id = pu.unternehmen_id
-               WHERE pu.person_id = ?
+               WHERE pu.person_id = ? AND u.deleted_at IS NULL
                ORDER BY pu.primary_company DESC, u.name""",
             (person_id,)
         ).fetchall()
@@ -317,7 +341,15 @@ async def person_aktualisieren(
     user = get_user(request)
     ip = get_client_ip(request)
 
-    email = email.strip() or None if email else None
+    # BUG-03: E-Mail-Format-Validierung vor DB-Schreiben
+    try:
+        email = _validate_email(email)
+    except ValueError as ve:
+        return JSONResponse(
+            {"detail": [{"loc": ["body", "email"], "msg": str(ve), "type": "value_error"}]},
+            status_code=422
+        )
+
     telefon = telefon.strip() or None if telefon else None
     position = position.strip() or None if position else None
     prospect_level = prospect_level or None
@@ -431,6 +463,17 @@ async def person_unternehmen_verknuepfen(
         if not p or not u:
             raise HTTPException(status_code=404, detail="Person oder Unternehmen nicht gefunden")
 
+        # BUG-04: Doppelte Verknüpfung → 422 statt 303
+        existing_link = conn.execute(
+            "SELECT 1 FROM person_unternehmen WHERE person_id=? AND unternehmen_id=?",
+            (person_id, unternehmen_id)
+        ).fetchone()
+        if existing_link:
+            return JSONResponse(
+                {"detail": [{"loc": ["body", "unternehmen_id"], "msg": "Verknüpfung bereits vorhanden", "type": "value_error"}]},
+                status_code=422
+            )
+
         # Wenn primary gesetzt: alle anderen primary=0 setzen
         if is_primary:
             conn.execute(
@@ -439,7 +482,7 @@ async def person_unternehmen_verknuepfen(
             )
 
         conn.execute(
-            """INSERT OR REPLACE INTO person_unternehmen (person_id, unternehmen_id, rolle, primary_company, created_at)
+            """INSERT INTO person_unternehmen (person_id, unternehmen_id, rolle, primary_company, created_at)
                VALUES (?, ?, ?, ?, ?)""",
             (person_id, unternehmen_id, rolle or None, is_primary, now_iso())
         )

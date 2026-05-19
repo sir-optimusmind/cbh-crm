@@ -91,6 +91,16 @@ async def unternehmen_erstellen(
 
     conn = get_connection()
     try:
+        # BUG-06: Duplikat-Prüfung vor INSERT → 422 statt 400 (Konsistenz mit Person-Validierung)
+        existing = conn.execute(
+            "SELECT id FROM unternehmen WHERE name=? AND deleted_at IS NULL", (name,)
+        ).fetchone()
+        if existing:
+            return JSONResponse(
+                {"detail": [{"loc": ["body", "name"], "msg": f"Unternehmen '{name}' existiert bereits", "type": "value_error"}]},
+                status_code=422
+            )
+
         ts = now_iso()
         cur = conn.execute(
             """INSERT INTO unternehmen (name, branche, groesse_ma, website, notes, created_by, created_at, updated_at)
@@ -144,6 +154,12 @@ def unternehmen_detail(request: Request, unternehmen_id: int):
         ).fetchall()
         alle_personen = [dict(p) for p in alle_p]
 
+        # BUG-01 (P0): person_count für Delete-Button-State im Template
+        person_count = conn.execute(
+            "SELECT COUNT(*) FROM person_unternehmen WHERE unternehmen_id=?",
+            (unternehmen_id,)
+        ).fetchone()[0]
+
     finally:
         conn.close()
 
@@ -152,6 +168,7 @@ def unternehmen_detail(request: Request, unternehmen_id: int):
         "unternehmen": unternehmen,
         "verknuepfungen": verknuepfungen,
         "alle_personen": alle_personen,
+        "person_count": person_count,
     })
 
 
@@ -249,6 +266,17 @@ async def unternehmen_loeschen(request: Request, unternehmen_id: int):
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Unternehmen nicht gefunden")
+
+        # BUG-01 (P0): Delete-Guard – Verknüpfte Personen prüfen vor Soft-Delete
+        linked_count = conn.execute(
+            "SELECT COUNT(*) FROM person_unternehmen WHERE unternehmen_id=?",
+            (unternehmen_id,)
+        ).fetchone()[0]
+        if linked_count > 0:
+            return JSONResponse(
+                {"error": "Erst Personen-Verknüpfungen lösen"},
+                status_code=422
+            )
 
         ts = now_iso()
         conn.execute(

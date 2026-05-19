@@ -19,12 +19,20 @@
   </div>
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
     <a href="{{ prefix }}/unternehmen/{{ unternehmen.id }}/edit" class="btn-primary">Bearbeiten</a>
+    {% if person_count > 0 %}
+    <button
+      class="btn-danger"
+      disabled
+      title="Erst {{ person_count }} Personen-Verknüpfung{{ 'en' if person_count > 1 else '' }} lösen"
+      style="opacity:0.45; cursor:not-allowed;">Löschen</button>
+    {% else %}
     <button
       hx-delete="{{ prefix }}/unternehmen/{{ unternehmen.id }}"
       hx-confirm="Unternehmen wirklich löschen? (Soft-Delete)"
       hx-target="#delete-result"
       hx-swap="innerHTML"
       class="btn-danger">Löschen</button>
+    {% endif %}
   </div>
 </div>
 <div id="delete-result"></div>
