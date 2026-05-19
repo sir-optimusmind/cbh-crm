@@ -1,5 +1,6 @@
 """
 routes/personen.py – CRM-003 (Person CRUD) + CRM-004 (Detail) + CRM-007 (n:m)
+                   + CRM-QW-02 (Stimmung) + CRM-QW-03 (Letzter Kontakt Filter)
 
 Regeln:
   - APP_PREFIX kommt aus main.py via router-Include (root_path reicht)
@@ -8,10 +9,12 @@ Regeln:
   - user aus X-Forwarded-User Header, Fallback "system" (MQ-03)
   - changed_fields bei CREATE = vollstaendig, UPDATE = nur Diff (MQ-04)
   - Soft-Delete via deleted_at
+  - stimmung: ENUM kalt/warm/heiss, Default kalt (CRM-QW-02)
+  - last_contact_at: nullable ISO8601, NULL = nie Kontakt (CRM-QW-03)
 """
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Request, Form, HTTPException
@@ -29,6 +32,7 @@ templates = Jinja2Templates(directory=_TEMPLATE_DIR)
 # Owner-Liste (CBH-Team)
 OWNERS = ["christian", "andre", "michi", "marco", "tim"]
 PROSPECT_LEVELS = ["Owner", "CxO", "Head", "Manager", "Other"]
+STIMMUNGEN = ["kalt", "warm", "heiss"]
 
 
 # ─── Hilfsfunktionen ──────────────────────────────────────────────────────────
@@ -67,10 +71,44 @@ def _enrich_person(row) -> dict:
     return p
 
 
+def _last_contact_sql_condition(letzter_kontakt: str) -> tuple[str, list]:
+    """
+    Gibt SQL-Fragment + Parameter für den Letzter-Kontakt-Filter zurück.
+    Nutzt last_contact_at Feld.
+    """
+    now = datetime.now(timezone.utc)
+
+    if letzter_kontakt == "heute":
+        cutoff = (now - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        return " AND p.last_contact_at >= ?", [cutoff]
+    elif letzter_kontakt == "7tage":
+        cutoff = (now - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        return " AND p.last_contact_at >= ?", [cutoff]
+    elif letzter_kontakt == "30tage":
+        cutoff = (now - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        return " AND p.last_contact_at >= ?", [cutoff]
+    elif letzter_kontakt == "90tage":
+        cutoff = (now - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        return " AND p.last_contact_at >= ?", [cutoff]
+    elif letzter_kontakt == "aelter90":
+        cutoff = (now - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        return " AND p.last_contact_at < ? AND p.last_contact_at IS NOT NULL", [cutoff]
+    elif letzter_kontakt == "nie":
+        return " AND p.last_contact_at IS NULL", []
+    else:
+        return "", []
+
+
 # ─── CRM-003: Listen-View ────────────────────────────────────────────────────
 
 @router.get("/personen", response_class=HTMLResponse)
-def personen_liste(request: Request, q: str = "", owner: str = ""):
+def personen_liste(
+    request: Request,
+    q: str = "",
+    owner: str = "",
+    stimmung: str = "",
+    letzter_kontakt: str = "",
+):
     prefix = request.scope.get("root_path", "")
     conn = get_connection()
     try:
@@ -87,6 +125,14 @@ def personen_liste(request: Request, q: str = "", owner: str = ""):
         if owner:
             sql += " AND p.created_by = ?"
             params.append(owner)
+        if stimmung:
+            sql += " AND p.stimmung = ?"
+            params.append(stimmung)
+
+        # Letzter-Kontakt-Filter
+        lk_sql, lk_params = _last_contact_sql_condition(letzter_kontakt)
+        sql += lk_sql
+        params += lk_params
 
         sql += " ORDER BY p.nachname, p.vorname"
         rows = conn.execute(sql, params).fetchall()
@@ -100,6 +146,9 @@ def personen_liste(request: Request, q: str = "", owner: str = ""):
         "q": q,
         "owner_filter": owner,
         "owners": OWNERS,
+        "stimmungen": STIMMUNGEN,
+        "stimmung_filter": stimmung,
+        "letzter_kontakt_filter": letzter_kontakt,
     })
 
 
@@ -112,6 +161,7 @@ def person_neu_form(request: Request):
         "prefix": prefix,
         "person": None,
         "owners": OWNERS,
+        "stimmungen": STIMMUNGEN,
     })
 
 
@@ -126,6 +176,8 @@ async def person_erstellen(
     telefon: Optional[str] = Form(None),
     position: Optional[str] = Form(None),
     prospect_level: Optional[str] = Form(None),
+    stimmung: Optional[str] = Form(None),
+    last_contact_at: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
     created_by: Optional[str] = Form(None),
 ):
@@ -133,11 +185,13 @@ async def person_erstellen(
     user = get_user(request)
     ip = get_client_ip(request)
 
-    # Leere Strings → None normalisieren
+    # Normalisierung
     email = email.strip() or None if email else None
     telefon = telefon.strip() or None if telefon else None
     position = position.strip() or None if position else None
     prospect_level = prospect_level or None
+    stimmung = stimmung if stimmung in STIMMUNGEN else "kalt"
+    last_contact_at = last_contact_at.strip() or None if last_contact_at else None
     notes = notes.strip() or None if notes else None
     created_by = created_by or user
 
@@ -145,9 +199,11 @@ async def person_erstellen(
     try:
         ts = now_iso()
         cur = conn.execute(
-            """INSERT INTO person (vorname, nachname, email, telefon, position, prospect_level, notes, created_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (vorname, nachname, email, telefon, position, prospect_level, notes, created_by, ts, ts)
+            """INSERT INTO person (vorname, nachname, email, telefon, position, prospect_level,
+               stimmung, last_contact_at, notes, created_by, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (vorname, nachname, email, telefon, position, prospect_level,
+             stimmung, last_contact_at, notes, created_by, ts, ts)
         )
         new_id = cur.lastrowid
 
@@ -157,6 +213,7 @@ async def person_erstellen(
             changed_fields={
                 "vorname": vorname, "nachname": nachname, "email": email,
                 "telefon": telefon, "position": position, "prospect_level": prospect_level,
+                "stimmung": stimmung, "last_contact_at": last_contact_at,
                 "notes": notes, "created_by": created_by,
             },
             ip_address=ip
@@ -211,6 +268,7 @@ def person_detail(request: Request, person_id: int):
         "person": person,
         "verknuepfungen": verknuepfungen,
         "alle_unternehmen": alle_unternehmen,
+        "stimmungen": STIMMUNGEN,
     })
 
 
@@ -234,6 +292,7 @@ def person_edit_form(request: Request, person_id: int):
         "prefix": prefix,
         "person": person,
         "owners": OWNERS,
+        "stimmungen": STIMMUNGEN,
     })
 
 
@@ -249,6 +308,8 @@ async def person_aktualisieren(
     telefon: Optional[str] = Form(None),
     position: Optional[str] = Form(None),
     prospect_level: Optional[str] = Form(None),
+    stimmung: Optional[str] = Form(None),
+    last_contact_at: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
     created_by: Optional[str] = Form(None),
 ):
@@ -260,6 +321,8 @@ async def person_aktualisieren(
     telefon = telefon.strip() or None if telefon else None
     position = position.strip() or None if position else None
     prospect_level = prospect_level or None
+    stimmung = stimmung if stimmung in STIMMUNGEN else "kalt"
+    last_contact_at = last_contact_at.strip() or None if last_contact_at else None
     notes = notes.strip() or None if notes else None
     created_by = created_by or user
 
@@ -275,15 +338,17 @@ async def person_aktualisieren(
         ts = now_iso()
         conn.execute(
             """UPDATE person SET vorname=?, nachname=?, email=?, telefon=?, position=?,
-               prospect_level=?, notes=?, created_by=?, updated_at=?
+               prospect_level=?, stimmung=?, last_contact_at=?, notes=?, created_by=?, updated_at=?
                WHERE id = ?""",
-            (vorname, nachname, email, telefon, position, prospect_level, notes, created_by, ts, person_id)
+            (vorname, nachname, email, telefon, position, prospect_level,
+             stimmung, last_contact_at, notes, created_by, ts, person_id)
         )
 
         # Diff berechnen (MQ-04): nur geaenderte Felder loggen
         new_vals = {
             "vorname": vorname, "nachname": nachname, "email": email,
             "telefon": telefon, "position": position, "prospect_level": prospect_level,
+            "stimmung": stimmung, "last_contact_at": last_contact_at,
             "notes": notes, "created_by": created_by,
         }
         diff = {k: {"old": old.get(k), "new": v} for k, v in new_vals.items() if old.get(k) != v}
@@ -393,7 +458,6 @@ async def person_unternehmen_verknuepfen(
     finally:
         conn.close()
 
-    # Ganze Seite neu laden via HTMX body swap
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url=f"{prefix}/personen/{person_id}", status_code=303)
 

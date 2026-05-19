@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ unternehmen.name }} – CBH CRM{% endblock %}
 {% block content %}
-<!-- Breadcrumb -->
-<div style="margin-bottom:16px; font-size:13px; color:#aaa;">
-  <a href="{{ prefix }}/unternehmen" style="color:#aaa; text-decoration:none;">Unternehmen</a>
-  <span style="margin:0 8px;">›</span>
-  <span style="color:#F0F0F0; font-weight:600;">{{ unternehmen.name }}</span>
+<!-- Zurück-Button + Breadcrumb -->
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+  <a href="{{ prefix }}/unternehmen" class="btn-secondary btn-sm">← Unternehmen</a>
+  <span style="font-size:13px; color:#aaa;">
+    <span style="color:#F0F0F0; font-weight:600;">{{ unternehmen.name }}</span>
+  </span>
 </div>
 
 <!-- Header Row -->

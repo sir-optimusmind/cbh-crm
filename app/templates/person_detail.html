@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ person.vorname }} {{ person.nachname }} – CBH CRM{% endblock %}
 {% block content %}
-<!-- Breadcrumb -->
-<div style="margin-bottom:16px; font-size:13px; color:#aaa;">
-  <a href="{{ prefix }}/personen" style="color:#aaa; text-decoration:none;">Personen</a>
-  <span style="margin:0 8px;">›</span>
-  <span style="color:#F0F0F0; font-weight:600;">{{ person.vorname }} {{ person.nachname }}</span>
+<!-- Zurück-Button + Breadcrumb -->
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+  <a href="{{ prefix }}/personen" class="btn-secondary btn-sm">← Personen</a>
+  <span style="font-size:13px; color:#aaa;">
+    <span style="color:#F0F0F0; font-weight:600;">{{ person.vorname }} {{ person.nachname }}</span>
+  </span>
 </div>
 
 <!-- Header Row -->
@@ -45,6 +46,20 @@
 
       <div style="color:#aaa; font-weight:600;">Prospect</div>
       <div>{% if person.prospect_level %}<span class="badge badge-blue">{{ person.prospect_level }}</span>{% else %}–{% endif %}</div>
+
+      <div style="color:#aaa; font-weight:600;">Stimmung</div>
+      <div>
+        {% if person.stimmung == 'heiss' %}
+        <span class="badge" style="background:rgba(185,28,28,0.25); color:#FCA5A5;">heiss</span>
+        {% elif person.stimmung == 'warm' %}
+        <span class="badge" style="background:rgba(180,83,9,0.25); color:#FCD34D;">warm</span>
+        {% else %}
+        <span class="badge" style="background:rgba(55,65,81,0.4); color:#9CA3AF;">kalt</span>
+        {% endif %}
+      </div>
+
+      <div style="color:#aaa; font-weight:600;">Letzter Kontakt</div>
+      <div style="font-size:13px; color:#aaa;">{{ person.last_contact_at[:10] if person.last_contact_at else '–' }}</div>
 
       <div style="color:#aaa; font-weight:600;">Owner</div>
       <div>{% if person.created_by %}<span class="badge badge-yellow">{{ person.created_by }}</span>{% else %}–{% endif %}</div>
@@ -124,7 +139,7 @@
         </div>
         <div style="display:flex; gap:8px;">
           <button type="submit" class="btn-primary btn-sm">Verknüpfen</button>
-          <button type="button" onclick="document.getElementById('link-company-panel').style.display='none'; document.querySelector('[onclick*=link-company-panel]').style.display=\'\'" class="btn-secondary btn-sm">Abbrechen</button>
+          <button type="button" onclick="document.getElementById('link-company-panel').style.display='none'; document.querySelector('[onclick*=link-company-panel]').style.display=''" class="btn-secondary btn-sm">Abbrechen</button>
         </div>
       </form>
     </div>

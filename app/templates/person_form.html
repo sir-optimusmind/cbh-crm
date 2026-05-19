@@ -2,7 +2,7 @@
 {% block title %}{{ 'Person bearbeiten' if person else 'Neue Person' }} – CBH CRM{% endblock %}
 {% block content %}
 <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
-  <a href="{{ prefix }}/personen{% if person %}/{{ person.id }}{% endif %}" style="color:#aaa; text-decoration:none; font-size:13px;">← Zurück</a>
+  <a href="{{ prefix }}/personen{% if person %}/{{ person.id }}{% endif %}" class="btn-secondary btn-sm">← Abbrechen</a>
   <h1 style="font-size:22px; font-weight:700; margin:0;">{{ 'Person bearbeiten' if person else 'Neue Person anlegen' }}</h1>
 </div>
 
@@ -57,6 +57,17 @@
         </select>
       </div>
       <div class="form-group">
+        <label>Stimmung</label>
+        <select name="stimmung">
+          {% for s in (stimmungen or ['kalt','warm','heiss']) %}
+          <option value="{{ s }}" {% if (person and person.stimmung == s) or (not person and s == 'kalt') %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div class="form-group">
         <label>Owner (Zuständiger)</label>
         <select name="created_by">
           <option value="">– wählen –</option>
@@ -64,6 +75,12 @@
           <option value="{{ o }}" {% if person and person.created_by == o %}selected{% elif not person and o == 'christian' %}selected{% endif %}>{{ o }}</option>
           {% endfor %}
         </select>
+      </div>
+      <div class="form-group">
+        <label>Letzter Kontakt (Datum)</label>
+        <input type="date" name="last_contact_at"
+          value="{{ person.last_contact_at[:10] if person and person.last_contact_at else '' }}"
+          placeholder="YYYY-MM-DD">
       </div>
     </div>
 

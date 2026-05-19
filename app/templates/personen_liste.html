@@ -9,11 +9,11 @@
 <!-- Such-/Filterleiste -->
 <div class="card" style="margin-bottom:16px; padding:14px 20px;">
   <form method="get" action="{{ prefix }}/personen" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
-    <div style="flex:1; min-width:200px;">
+    <div style="flex:1; min-width:180px;">
       <label>Suche (Name / E-Mail)</label>
       <input type="text" name="q" value="{{ q or '' }}" placeholder="Max Mustermann oder max@firma.de">
     </div>
-    <div style="min-width:160px;">
+    <div style="min-width:130px;">
       <label>Owner</label>
       <select name="owner">
         <option value="">Alle</option>
@@ -22,9 +22,30 @@
         {% endfor %}
       </select>
     </div>
+    <div style="min-width:120px;">
+      <label>Stimmung</label>
+      <select name="stimmung">
+        <option value="">Alle</option>
+        {% for s in stimmungen %}
+        <option value="{{ s }}" {% if stimmung_filter == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="min-width:160px;">
+      <label>Letzter Kontakt</label>
+      <select name="letzter_kontakt">
+        <option value="" {% if not letzter_kontakt_filter %}selected{% endif %}>Alle</option>
+        <option value="heute"    {% if letzter_kontakt_filter == 'heute'    %}selected{% endif %}>Heute</option>
+        <option value="7tage"    {% if letzter_kontakt_filter == '7tage'    %}selected{% endif %}>Letzte 7 Tage</option>
+        <option value="30tage"   {% if letzter_kontakt_filter == '30tage'   %}selected{% endif %}>Letzte 30 Tage</option>
+        <option value="90tage"   {% if letzter_kontakt_filter == '90tage'   %}selected{% endif %}>Letzte 90 Tage</option>
+        <option value="aelter90" {% if letzter_kontakt_filter == 'aelter90' %}selected{% endif %}>Älter als 90 Tage</option>
+        <option value="nie"      {% if letzter_kontakt_filter == 'nie'      %}selected{% endif %}>Noch nie</option>
+      </select>
+    </div>
     <div>
       <button type="submit" class="btn-secondary">Filtern</button>
-      {% if q or owner_filter %}
+      {% if q or owner_filter or stimmung_filter or letzter_kontakt_filter %}
       <a href="{{ prefix }}/personen" class="btn-secondary" style="margin-left:8px;">Zurücksetzen</a>
       {% endif %}
     </div>
@@ -40,9 +61,10 @@
         <th>Name</th>
         <th>E-Mail</th>
         <th>Position</th>
+        <th>Stimmung</th>
+        <th>Letzter Kontakt</th>
         <th>Primäre Firma</th>
         <th>Owner</th>
-        <th>Angelegt</th>
         <th style="width:120px;"></th>
       </tr>
     </thead>
@@ -57,6 +79,17 @@
         <td style="color:#aaa;">{{ p.email or '–' }}</td>
         <td>{{ p.position or '–' }}</td>
         <td>
+          {% set s = p.stimmung or 'kalt' %}
+          {% if s == 'heiss' %}
+          <span class="badge" style="background:rgba(185,28,28,0.25); color:#FCA5A5;">heiss</span>
+          {% elif s == 'warm' %}
+          <span class="badge" style="background:rgba(180,83,9,0.25); color:#FCD34D;">warm</span>
+          {% else %}
+          <span class="badge" style="background:rgba(55,65,81,0.4); color:#9CA3AF;">kalt</span>
+          {% endif %}
+        </td>
+        <td style="color:#aaa; font-size:12px;">{{ p.last_contact_at[:10] if p.last_contact_at else '–' }}</td>
+        <td>
           {% if p.primary_company_name %}
           <a href="{{ prefix }}/unternehmen/{{ p.primary_company_id }}" style="color:#5870E2; text-decoration:none;">{{ p.primary_company_name }}</a>
           {% else %}–{% endif %}
@@ -66,7 +99,6 @@
           <span class="badge badge-blue">{{ p.created_by }}</span>
           {% else %}–{% endif %}
         </td>
-        <td style="color:#aaa; font-size:12px;">{{ p.created_at[:10] if p.created_at else '–' }}</td>
         <td style="text-align:right;">
           <a href="{{ prefix }}/personen/{{ p.id }}" class="btn-secondary btn-sm">Detail</a>
           <a href="{{ prefix }}/personen/{{ p.id }}/edit" class="btn-secondary btn-sm" style="margin-left:4px;">Edit</a>
@@ -77,8 +109,8 @@
   </table>
   {% else %}
   <div style="padding:40px; text-align:center; color:#aaa;">
-    {% if q or owner_filter %}
-    Keine Personen gefunden für "{{ q or owner_filter }}".
+    {% if q or owner_filter or stimmung_filter or letzter_kontakt_filter %}
+    Keine Personen gefunden für die gewählten Filter.
     {% else %}
     Noch keine Personen angelegt. <a href="{{ prefix }}/personen/neu" style="color:#FFFB76;">Erste Person anlegen →</a>
     {% endif %}
