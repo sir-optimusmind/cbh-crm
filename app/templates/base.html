@@ -3,133 +3,189 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}CBH MISSION CTRL – CRM{% endblock %}</title>
+  <title>{% block title %}CBH MISSION CTRL{% endblock %}</title>
+
+  <!-- Barlow Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;900&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Theme Init: VOR CSS laden → kein FOUC -->
   <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            'cbh-dark':   '#1E1E1E',
-            'cbh-yellow': '#FFFB76',
-            'cbh-blue':   '#5870E2',
-          },
-          fontFamily: {
-            'barlow': ['Barlow', 'sans-serif'],
-          }
-        }
+    (function() {
+      function applyTheme(pref) {
+        var isDark = pref === 'dark' ||
+          (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        localStorage.setItem('cbh-theme', pref);
       }
-    }
+      var saved = localStorage.getItem('cbh-theme') || 'dark';
+      applyTheme(saved);
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+        if (localStorage.getItem('cbh-theme') === 'system') applyTheme('system');
+      });
+    })();
   </script>
+
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+
+  <!-- App CSS (CSS-Variables + alle Sprint-3-Wave-2-Klassen) -->
+  <link rel="stylesheet" href="{{ prefix }}/static/app.css">
+
   <style>
-    body { font-family: 'Barlow', sans-serif; background: #1E1E1E; color: #F0F0F0; }
-    .btn-primary { background: #FFFB76; color: #1E1E1E; font-weight: 600; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; text-decoration: none; display: inline-block; }
-    .btn-primary:hover { background: #f0ec60; }
-    .btn-secondary { background: #2a2a2a; color: #F0F0F0; font-weight: 600; padding: 8px 16px; border-radius: 6px; border: 1px solid #3a3a3a; cursor: pointer; text-decoration: none; display: inline-block; }
-    .btn-secondary:hover { background: #333; }
-    .btn-danger { background: #DC2626; color: #fff; font-weight: 600; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; text-decoration: none; display: inline-block; }
-    .btn-danger:hover { background: #b91c1c; }
-    .btn-sm { padding: 4px 10px; font-size: 13px; }
-    input, select, textarea { background: #2a2a2a; border: 1px solid #3a3a3a; color: #F0F0F0; padding: 8px 12px; border-radius: 6px; width: 100%; box-sizing: border-box; font-family: 'Barlow', sans-serif; }
-    input:focus, select:focus, textarea:focus { outline: none; border-color: #5870E2; }
-    label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 13px; color: #aaa; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-family: 'Barlow', sans-serif;
+      height: 100%;
+    }
+    /* Shell-Layout: Topbar sticky + Sidebar fixed + Main scrollable */
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    /* Main verschiebt sich um Sidebar-Breite auf Desktop */
+    main.content-area {
+      margin-left: var(--sidebar-width);
+      flex: 1;
+      overflow-y: auto;
+      background: var(--bg-base);
+    }
+    @media (max-width: 1024px) {
+      main.content-area { margin-left: 0; }
+    }
+
+    /* Formular-Elemente */
+    input, select, textarea {
+      background: var(--bg-input); border: 1px solid var(--border);
+      color: var(--text-primary); padding: 8px 12px; border-radius: 6px;
+      width: 100%; box-sizing: border-box; font-family: 'Barlow', sans-serif;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: var(--accent-blue);
+    }
+    label {
+      display: block; margin-bottom: 4px; font-weight: 600;
+      font-size: 13px; color: var(--text-muted);
+    }
     .form-group { margin-bottom: 16px; }
     table { width: 100%; border-collapse: collapse; }
-    th { text-align: left; padding: 10px 12px; background: #252525; font-size: 12px; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid #333; }
-    td { padding: 10px 12px; border-bottom: 1px solid #2a2a2a; font-size: 14px; }
-    tr:hover td { background: #252525; }
-    .card { background: #252525; border: 1px solid #333; border-radius: 8px; padding: 20px; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-    .badge-blue { background: rgba(88,112,226,0.2); color: #5870E2; }
-    .badge-yellow { background: rgba(255,251,118,0.15); color: #FFFB76; }
-    .badge-green { background: rgba(5,150,105,0.2); color: #34D399; }
-    .badge-red { background: rgba(220,38,38,0.2); color: #FCA5A5; }
-    .badge-orange { background: rgba(234,88,12,0.2); color: #FB923C; }
-    .flash-success { background: rgba(5,150,105,0.15); border: 1px solid #059669; color: #34D399; padding: 10px 16px; border-radius: 6px; margin-bottom: 16px; }
-    .flash-error { background: rgba(220,38,38,0.15); border: 1px solid #DC2626; color: #FCA5A5; padding: 10px 16px; border-radius: 6px; margin-bottom: 16px; }
-    #htmx-indicator { display: none; position: fixed; top: 0; left: 0; right: 0; height: 3px; background: #FFFB76; z-index: 9999; }
-    .htmx-request #htmx-indicator { display: block; }
+    th {
+      text-align: left; padding: 10px 12px; background: var(--bg-card);
+      font-size: 12px; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--border-sub); font-size: 14px; }
+    tr:hover td { background: var(--bg-card); }
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+
     /* Kanban */
     .kanban-col { min-height: 200px; }
-    .deal-card { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 12px; margin-bottom: 8px; cursor: grab; }
+    .deal-card {
+      background: var(--bg-inset); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px; margin-bottom: 8px; cursor: grab;
+    }
     .deal-card:active { cursor: grabbing; }
     .deal-card.sortable-ghost { opacity: 0.4; }
-    .deal-card.dragging-error { border-color: #DC2626; animation: shake 0.3s; }
+    .deal-card.dragging-error { border-color: var(--status-error); animation: shake 0.3s; }
     @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+
     /* Progress Bar */
-    .progress-bar { height: 6px; border-radius: 3px; background: #333; overflow: hidden; }
+    .progress-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
     .progress-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
-    /* User-Avatar */
-    .user-avatar { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #1E1E1E; flex-shrink: 0; }
-    .logout-form { display: inline; }
+
+    /* HTMX Indicator (top bar line) */
+    #htmx-indicator { display: none; position: fixed; top: 0; left: 0; right: 0; height: 3px; background: var(--accent-yellow); z-index: 9999; }
+    .htmx-request #htmx-indicator { display: block; }
+
+    /* Breadcrumb Mobile truncation */
+    @media (max-width: 1024px) {
+      nav[aria-label="Breadcrumb"] span[aria-current="page"] { max-width: 140px; }
+    }
+
+    /* Dialog backdrop fuer Command Palette */
+    dialog#cmd-palette::backdrop {
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(2px);
+    }
+    [data-theme="light"] dialog#cmd-palette::backdrop {
+      background: rgba(15, 15, 15, 0.40);
+    }
   </style>
+
+  {% block head %}{% endblock %}
 </head>
 <body>
   <div id="htmx-indicator"></div>
 
-  <!-- Header -->
-  <header style="background:#1a1a1a; border-bottom:1px solid #333; padding:12px 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:50;">
-    <div style="display:flex; align-items:center; gap:12px;">
-      <a href="https://hook.srv960331.hstgr.cloud/mission-ctrl/" style="text-decoration:none;">
-        <span style="font-weight:900; font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:#F0F0F0;">CBH</span>
-        <span style="color:#444; font-size:12px; margin:0 6px;">|</span>
-        <span style="font-weight:900; font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:#FFFB76;">MISSION CTRL</span>
-      </a>
-      <span style="color:#444; font-size:12px;">|</span>
-      <span style="font-weight:600; font-size:13px; letter-spacing:0.08em; text-transform:uppercase; color:#aaa;">CRM</span>
-    </div>
-    <nav style="display:flex; align-items:center; gap:20px;">
-      {# Active-State: request.url.path gegen prefix-bereinigte Pfade prüfen. #}
-      {# Pipeline-Gruppe: /pipeline, /deals #}
-      {# CRM-Gruppe: /personen, /unternehmen, /touchpoints #}
-      {# Projekte-Gruppe: /projects, /projekte #}
-      {% set path = request.url.path %}
-      <a href="{{ prefix }}/pipeline"
-         style="color:{% if path.startswith(prefix + '/pipeline') or path.startswith(prefix + '/deals') %}#FFFB76{% else %}#aaa{% endif %}; text-decoration:none; font-size:13px; font-weight:{% if path.startswith(prefix + '/pipeline') or path.startswith(prefix + '/deals') %}700{% else %}600{% endif %};"
-         {% if not (path.startswith(prefix + '/pipeline') or path.startswith(prefix + '/deals')) %}onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'"{% endif %}
-         title="Pipeline-Kanban">Pipeline</a>
-      <a href="{{ prefix }}/deals"
-         style="color:{% if path.startswith(prefix + '/deals') %}#FFFB76{% else %}#aaa{% endif %}; text-decoration:none; font-size:13px; font-weight:{% if path.startswith(prefix + '/deals') %}700{% else %}600{% endif %};"
-         {% if not path.startswith(prefix + '/deals') %}onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'"{% endif %}>Deals</a>
-      <a href="{{ prefix }}/personen"
-         style="color:{% if path.startswith(prefix + '/personen') or path.startswith(prefix + '/unternehmen') or path.startswith(prefix + '/touchpoints') %}#FFFB76{% else %}#aaa{% endif %}; text-decoration:none; font-size:13px; font-weight:{% if path.startswith(prefix + '/personen') or path.startswith(prefix + '/unternehmen') or path.startswith(prefix + '/touchpoints') %}700{% else %}600{% endif %};"
-         {% if not (path.startswith(prefix + '/personen') or path.startswith(prefix + '/unternehmen') or path.startswith(prefix + '/touchpoints')) %}onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'"{% endif %}>Personen</a>
-      <a href="{{ prefix }}/unternehmen"
-         style="color:{% if path.startswith(prefix + '/personen') or path.startswith(prefix + '/unternehmen') or path.startswith(prefix + '/touchpoints') %}#FFFB76{% else %}#aaa{% endif %}; text-decoration:none; font-size:13px; font-weight:{% if path.startswith(prefix + '/personen') or path.startswith(prefix + '/unternehmen') or path.startswith(prefix + '/touchpoints') %}700{% else %}600{% endif %};"
-         {% if not (path.startswith(prefix + '/personen') or path.startswith(prefix + '/unternehmen') or path.startswith(prefix + '/touchpoints')) %}onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'"{% endif %}>Unternehmen</a>
-      <a href="{{ prefix }}/projects"
-         style="color:{% if path.startswith(prefix + '/projects') or path.startswith(prefix + '/projekte') %}#FFFB76{% else %}#aaa{% endif %}; text-decoration:none; font-size:13px; font-weight:{% if path.startswith(prefix + '/projects') or path.startswith(prefix + '/projekte') %}700{% else %}600{% endif %};"
-         {% if not (path.startswith(prefix + '/projects') or path.startswith(prefix + '/projekte')) %}onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'"{% endif %}>Projekte</a>
-      <!-- User-Avatar + Logout -->
-      {% if current_user %}
-      <div style="display:flex; align-items:center; gap:8px; margin-left:8px; border-left:1px solid #333; padding-left:16px;">
-        <span class="user-avatar" style="background:{{ current_user.color }};" title="{{ current_user.email }}">
-          {{ current_user.name[:1].upper() }}
-        </span>
-        <span style="font-size:12px; color:#888;">{{ current_user.name }}</span>
-        <form class="logout-form" action="{{ prefix }}/auth/logout" method="post">
-          <button type="submit" style="background:none; border:none; color:#666; cursor:pointer; font-size:12px; padding:4px 6px; border-radius:4px; font-family:'Barlow',sans-serif;" onmouseover="this.style.color='#FCA5A5'" onmouseout="this.style.color='#666'" title="Abmelden">
-            Logout
-          </button>
-        </form>
-      </div>
-      {% endif %}
-    </nav>
-  </header>
+  <div class="app-shell">
 
-  <!-- Main -->
-  <main style="max-width:1400px; margin:0 auto; padding:24px;">
-    {% if flash_success %}
-    <div class="flash-success">{{ flash_success }}</div>
-    {% endif %}
-    {% if flash_error %}
-    <div class="flash-error">{{ flash_error }}</div>
-    {% endif %}
-    {% block content %}{% endblock %}
-  </main>
+    <!-- Topbar (sticky, 52px) -->
+    {% include '_topbar.html' %}
+
+    <!-- Breadcrumb (sticky unter Topbar, 36px) – auf Home-Route nicht noetig, aber harmlos -->
+    {% include '_breadcrumb.html' %}
+
+    <!-- Sidebar (fixed, 220px) + Mobile-Backdrop -->
+    {% include '_sidebar.html' %}
+
+    <!-- Haupt-Content-Bereich -->
+    <main class="content-area">
+      {% if flash_success %}
+      <div class="flash-success" style="margin: 16px 40px 0;">{{ flash_success }}</div>
+      {% endif %}
+      {% if flash_error %}
+      <div class="flash-error" style="margin: 16px 40px 0;">{{ flash_error }}</div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+
+  </div>
+
+  <!-- Command Palette (Modal + JS) -->
+  {% include '_command_palette.html' %}
+
+  <!-- Sidebar Mobile-Drawer JS -->
+  <script>
+    (function() {
+      // Hamburger-Toggle
+      var toggle = document.getElementById('sidebar-toggle');
+      var sidebar = document.getElementById('sidebar');
+      var backdrop = document.getElementById('sidebar-backdrop');
+
+      if (toggle && sidebar && backdrop) {
+        toggle.addEventListener('click', function() {
+          sidebar.classList.toggle('open');
+          backdrop.classList.toggle('visible');
+        });
+        backdrop.addEventListener('click', function() {
+          sidebar.classList.remove('open');
+          backdrop.classList.remove('visible');
+        });
+
+        // ESC schliesst Drawer (wenn Command Palette nicht offen)
+        document.addEventListener('keydown', function(e) {
+          if (e.key !== 'Escape') return;
+          var dialog = document.getElementById('cmd-palette');
+          if (dialog && dialog.open) return; // Palette hat Vorrang
+          sidebar.classList.remove('open');
+          backdrop.classList.remove('visible');
+        });
+
+        // Klick auf Sidebar-Link → Drawer schliessen (Mobile)
+        document.querySelectorAll('#sidebar a, #sidebar button[type="submit"]').forEach(function(el) {
+          el.addEventListener('click', function() {
+            sidebar.classList.remove('open');
+            backdrop.classList.remove('visible');
+          });
+        });
+      }
+    })();
+  </script>
 
   {% block scripts %}{% endblock %}
 </body>

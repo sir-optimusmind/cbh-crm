@@ -1,0 +1,113 @@
+{# templates/_topbar.html – Sprint 3 Wave 2 (CRM-045) #}
+{# Erwartet im Context: prefix, current_user (mit initials, color_idx) #}
+<header id="topbar"
+        style="height: var(--topbar-height);
+               background: var(--bg-nav);
+               border-bottom: 1px solid var(--border-sub);
+               position: sticky; top: 0; z-index: 200;
+               display: flex; align-items: center;
+               padding: 0 20px;
+               justify-content: space-between;
+               flex-shrink: 0;">
+
+  <!-- Links: Hamburger (Mobile only) + Logo + Separator + Wortmarke -->
+  <div style="display: flex; align-items: center; gap: 12px;">
+
+    <!-- Hamburger: nur < 1024px (CSS-Klasse hamburger-btn steuert display) -->
+    <button id="sidebar-toggle"
+            class="hamburger-btn"
+            aria-label="Navigation oeffnen"
+            style="display: none;
+                   width: 36px; height: 36px;
+                   background: transparent; border: none;
+                   color: var(--text-muted); cursor: pointer;
+                   padding: 4px; border-radius: 6px;
+                   align-items: center; justify-content: center;"
+            onmouseover="this.style.color='var(--text-primary)'; this.style.background='rgba(255,255,255,0.06)'"
+            onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+
+    <!-- Rockfist Logo -->
+    <img src="{{ prefix }}/static/brand/logo-white-transparent.svg"
+         alt="CBH" style="height: 20px; opacity: 0.85;" />
+
+    <!-- Separator -->
+    <span style="color: var(--border); font-size: 12px;">|</span>
+
+    <!-- Wortmarke -->
+    <span style="font-family: 'Barlow', sans-serif;
+                 font-weight: 900;
+                 font-size: 13px;
+                 letter-spacing: 0.14em;
+                 text-transform: uppercase;
+                 color: var(--text-primary);
+                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;">
+      CBH MISSION CTRL
+    </span>
+  </div>
+
+  <!-- Rechts: Gear + Avatar + Logout (je 28x28px, gap: 8px) -->
+  <div style="display: flex; align-items: center; gap: 8px;">
+
+    <!-- Settings-Gear (Link zu /settings) -->
+    <a href="{{ prefix }}/settings"
+       id="topbar-settings-btn"
+       title="Einstellungen"
+       style="display: flex; align-items: center; justify-content: center;
+              width: 28px; height: 28px;
+              border: 1px solid var(--border-sub); border-radius: 6px;
+              color: var(--text-muted); text-decoration: none;
+              transition: border-color 0.12s, color 0.12s;"
+       onmouseover="this.style.borderColor='var(--accent-blue)'; this.style.color='var(--text-primary)'"
+       onmouseout="this.style.borderColor='var(--border-sub)'; this.style.color='var(--text-muted)'">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </a>
+
+    <!-- Avatar-Kreis: Initialen des eingeloggten Users -->
+    {% if current_user %}
+    <div title="{{ current_user.display_name }}"
+         class="avatar avatar-color-{{ current_user.color_idx }}"
+         style="width: 28px; height: 28px; border-radius: 50%;
+                display: flex; align-items: center; justify-content: center;
+                font-family: 'Barlow', sans-serif;
+                font-size: 11px; font-weight: 700; color: #FFFFFF;
+                flex-shrink: 0; cursor: default;">
+      {{ current_user.initials | default('?') }}
+    </div>
+    {% else %}
+    <div style="width: 28px; height: 28px; border-radius: 50%;
+                display: flex; align-items: center; justify-content: center;
+                background: var(--bg-input); font-size: 11px; font-weight: 700;
+                color: var(--text-muted);">??</div>
+    {% endif %}
+
+    <!-- Logout (POST-Form, Icon-Button) -->
+    <form action="{{ prefix }}/auth/logout" method="post" style="display: inline; margin: 0;">
+      <button type="submit"
+              title="Abmelden"
+              style="display: flex; align-items: center; justify-content: center;
+                     width: 28px; height: 28px;
+                     background: transparent; border: none;
+                     color: var(--text-muted); cursor: pointer;
+                     transition: color 0.12s;"
+              onmouseover="this.style.color='var(--text-primary)'"
+              onmouseout="this.style.color='var(--text-muted)'">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
+    </form>
+
+  </div>
+</header>

@@ -1,0 +1,52 @@
+{# templates/_breadcrumb.html – Sprint 3 Wave 2 (CRM-047) #}
+{# Erwartet im Context: breadcrumb (Liste von {label, path, active}) #}
+{# Kommt automatisch aus shared/templating.py.render() #}
+
+<nav aria-label="Breadcrumb"
+     style="height: var(--breadcrumb-height);
+            background: var(--bg-header);
+            border-bottom: 1px solid var(--border-sub);
+            display: flex; align-items: center;
+            padding: 0 40px;
+            position: sticky;
+            top: var(--topbar-height);
+            z-index: 190;
+            gap: 0; flex-shrink: 0;">
+
+  {% for crumb in breadcrumb %}
+
+    {% if crumb.label == '...' %}
+      {# Truncation-Marker: nicht klickbar #}
+      <span style="font-size: 12px; font-weight: 600;
+                   color: var(--text-muted); padding: 0 2px;">...</span>
+      <span style="color: var(--border); font-size: 10px;
+                   user-select: none; padding: 0 6px;">›</span>
+
+    {% elif not crumb.active %}
+      {# Klickbarer Eintrag (nicht letzter) #}
+      <a href="{{ crumb.path }}"
+         style="font-size: 12px; font-weight: 600;
+                color: var(--text-muted); text-decoration: none;
+                transition: color 0.12s; white-space: nowrap;"
+         onmouseover="this.style.color='var(--text-primary)'"
+         onmouseout="this.style.color='var(--text-muted)'">
+        {{ crumb.label }}
+      </a>
+      {# Trenner: U+203A (schlanker als >) #}
+      <span style="color: var(--border); font-size: 10px;
+                   user-select: none; padding: 0 6px;">›</span>
+
+    {% else %}
+      {# Letzter Eintrag: aktiv, nicht klickbar #}
+      <span aria-current="page"
+            style="font-size: 12px; font-weight: 600;
+                   color: var(--text-primary); white-space: nowrap;
+                   overflow: hidden; text-overflow: ellipsis; max-width: 240px;">
+        {{ crumb.label }}
+      </span>
+
+    {% endif %}
+
+  {% endfor %}
+
+</nav>

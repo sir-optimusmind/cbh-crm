@@ -1,6 +1,7 @@
 """
 main.py – CBH MISSION CTRL CRM Module
 FastAPI App – Sprint 1 + Sprint 2 + Sprint 3 (SSO + Modul-Trennung)
+Sprint 3 Wave 2: Sidebar + Breadcrumb + Command-Palette + Home-Dashboard
 
 APP_PREFIX kommt aus .env (PFLICHT, nie hardcoden).
 SSO via Google OAuth (CRM-031/032/033/034).
@@ -12,18 +13,17 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.db import init_db
 from app.auth import router as auth_router, SECRET_KEY, SESSION_MAX_AGE
+from app.shared.templating import render
 
 # ─── Modul-Router ─────────────────────────────────────────────────────────────
-# CRM-Modul: Personen + Unternehmen + Touchpoints
 from app.modules.crm.routes import router as crm_router
-# Pipeline-Modul: Deals + Pipeline-Kanban
 from app.modules.pipeline.routes import router as pipeline_router
-# Projects-Modul
 from app.modules.projects.routes import router as projects_router
 
 # ─── Konfiguration aus .env ───────────────────────────────────────────────────
@@ -47,11 +47,16 @@ app = FastAPI(
     root_path=APP_PREFIX,
 )
 
+# ─── Static Files ─────────────────────────────────────────────────────────────
+_STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+
+
 # ─── Auth-Guard Middleware ────────────────────────────────────────────────────
 class AuthGuardMiddleware(BaseHTTPMiddleware):
     """
     Prueft Session bei jedem Request.
-    Oeffentliche Pfade: /health, /auth/*
+    Oeffentliche Pfade: /health, /auth/*, /static/*
     Alle anderen: Session-Check, sonst Redirect zu /auth/login.
 
     Middleware-Reihenfolge (LIFO):
@@ -60,7 +65,7 @@ class AuthGuardMiddleware(BaseHTTPMiddleware):
     AuthGuardMiddleware hat request.session verfuegbar.
     """
 
-    PUBLIC_PATHS = ("/health", "/auth/login", "/auth/callback", "/auth/logout")
+    PUBLIC_PATHS = ("/health", "/auth/login", "/auth/callback", "/auth/logout", "/static")
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -69,14 +74,14 @@ class AuthGuardMiddleware(BaseHTTPMiddleware):
         if not relative:
             relative = "/"
 
-        # Oeffentliche Pfade
+        # Oeffentliche Pfade (inkl. Static)
         if any(relative == p or relative.startswith(p) for p in self.PUBLIC_PATHS):
             return await call_next(request)
 
         # Session pruefen
         user = request.session.get("user")
         if not user:
-            request.session["next"] = path
+            request.session["next"] = path if path.startswith(root) else f"{root}{path}"
             return RedirectResponse(url=f"{root}/auth/login", status_code=302)
 
         request.state.crm_user = user
@@ -96,14 +101,9 @@ app.add_middleware(
 )
 
 # ─── Router einbinden ─────────────────────────────────────────────────────────
-# Auth-Router (Login/Callback/Logout)
 app.include_router(auth_router)
-# CRM-Modul: Personen + Unternehmen + Touchpoints (keine eigene URL-Prefix-Ebene,
-# da die Routen ihre Pfade direkt definieren: /personen, /unternehmen, /touchpoints)
 app.include_router(crm_router)
-# Pipeline-Modul: Deals + Pipeline-Kanban (/deals, /pipeline)
 app.include_router(pipeline_router)
-# Projects-Modul: (/projects)
 app.include_router(projects_router)
 
 
@@ -118,8 +118,17 @@ async def health():
     })
 
 
-# ─── Root Redirect → /personen ────────────────────────────────────────────────
+# ─── Home-Dashboard (Sprint 3 Wave 2: CRM-046) ────────────────────────────────
 @app.get("/")
-async def root(request: Request):
-    prefix = request.scope.get("root_path", "")
-    return RedirectResponse(url=f"{prefix}/personen", status_code=302)
+async def home_dashboard(request: Request):
+    """
+    Home-Dashboard: 5 Tool-Kacheln mit KPI-Platzhaltern.
+    KPI-Werte werden via HTMX nachgeladen (GET /api/kpis/summary).
+    """
+    return render(request, "home.html")
+
+
+# ─── Settings-Route (Stub, Sprint 3 Wave 2: CRM-045) ─────────────────────────
+@app.get("/settings")
+async def settings(request: Request):
+    return render(request, "settings.html")

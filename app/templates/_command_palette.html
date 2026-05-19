@@ -1,0 +1,325 @@
+{# templates/_command_palette.html – Sprint 3 Wave 2 (CRM-048) #}
+{# Eingebunden in jedem Layout-Base-Template, einmal pro Seite #}
+{# Erwartet im Context: prefix #}
+
+<dialog id="cmd-palette"
+        style="margin: 0;
+               position: fixed;
+               top: 25vh;
+               left: 50%;
+               transform: translateX(-50%);
+               width: 600px; max-width: calc(100vw - 32px);
+               background: var(--bg-header);
+               border: 1px solid var(--border);
+               border-radius: 12px;
+               box-shadow: 0 24px 64px rgba(0,0,0,0.55), 0 0 0 1px var(--border-sub);
+               overflow: hidden;
+               padding: 0;">
+
+  <!-- Input-Zeile -->
+  <div style="display: flex; align-items: center; gap: 10px;
+              padding: 14px 16px;
+              border-bottom: 1px solid var(--border-sub);">
+
+    <!-- Search-Icon -->
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+         style="color: var(--text-muted); flex-shrink: 0;">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+
+    <input id="cmd-input"
+           type="text"
+           placeholder="Suche oder navigiere..."
+           autocomplete="off" autocorrect="off" spellcheck="false"
+           style="flex: 1; background: transparent; border: none; outline: none;
+                  font-family: 'Barlow', sans-serif; font-size: 15px; font-weight: 500;
+                  color: var(--text-primary);"
+           oninput="cmdPaletteFilter(this.value)" />
+
+    <!-- ESC-Hint -->
+    <kbd style="font-size: 11px; color: var(--text-muted); font-weight: 600;
+                display: inline-flex; align-items: center; justify-content: center;
+                height: 18px; padding: 0 5px;
+                background: var(--bg-input); border: 1px solid var(--border-sub);
+                border-radius: 3px; flex-shrink: 0; font-family: 'Barlow', sans-serif;">
+      ESC
+    </kbd>
+  </div>
+
+  <!-- Item-Liste -->
+  <div id="cmd-list"
+       role="listbox"
+       style="max-height: 320px; overflow-y: auto; padding: 6px 0;">
+    <div id="cmd-items-container">
+      {# Initial-Rendering durch JS nach DOMContentLoaded #}
+      <div style="padding: 16px; font-size: 13px; color: var(--text-muted);">Lade...</div>
+    </div>
+  </div>
+
+  <!-- Footer: Tastatur-Hints -->
+  <div style="display: flex; align-items: center; gap: 16px;
+              padding: 8px 16px;
+              border-top: 1px solid var(--border-sub);
+              background: var(--bg-nav);">
+    {% for hint_keys, hint_label in [(['↑','↓'], 'Navigieren'), (['↵'], 'Oeffnen'), (['ESC'], 'Schliessen')] %}
+    <div style="display: flex; align-items: center; gap: 5px;
+                font-size: 11px; color: var(--text-muted);">
+      {% for k in hint_keys %}
+      <kbd style="display: inline-flex; align-items: center; justify-content: center;
+                  height: 18px; min-width: 18px; padding: 0 4px;
+                  background: var(--bg-input); border: 1px solid var(--border-sub);
+                  border-radius: 3px; font-size: 10px; font-weight: 700;
+                  color: var(--text-secondary); font-family: 'Barlow', sans-serif;">{{ k }}</kbd>
+      {% endfor %}
+      {{ hint_label }}
+    </div>
+    {% endfor %}
+  </div>
+</dialog>
+
+<!-- Command Palette Items: statischer JSON-Index (Phase 1) -->
+<script id="palette-items" type="application/json">
+[
+  {"section": "Navigation", "label": "Home",              "path": "{{ prefix }}/",                       "key": "home",        "disabled": false},
+  {"section": "Navigation", "label": "Cold Calling",      "path": "/coldcall-staging/",                  "key": "coldcall",    "disabled": false},
+  {"section": "Navigation", "label": "CRM – Personen",    "path": "{{ prefix }}/personen",               "key": "crm",         "disabled": false},
+  {"section": "Navigation", "label": "CRM – Unternehmen", "path": "{{ prefix }}/unternehmen",            "key": "crm",         "disabled": false},
+  {"section": "Navigation", "label": "Deal Pipeline",     "path": "{{ prefix }}/pipeline",               "key": "pipeline",    "disabled": false},
+  {"section": "Navigation", "label": "Projekte",          "path": "{{ prefix }}/projects",               "key": "projekte",    "disabled": false},
+  {"section": "Navigation", "label": "Storyteller",       "path": null,                                   "key": "storyteller", "disabled": true},
+  {"section": "Aktionen",   "label": "Neue Person anlegen","path": "{{ prefix }}/personen/neu",           "key": "new-person",  "disabled": false},
+  {"section": "Aktionen",   "label": "Neuen Deal anlegen", "path": "{{ prefix }}/pipeline",               "key": "new-deal",    "disabled": false},
+  {"section": "Aktionen",   "label": "Einstellungen",     "path": "{{ prefix }}/settings",               "key": "settings",    "disabled": false},
+  {"section": "Aktionen",   "label": "Abmelden",          "path": "{{ prefix }}/auth/logout",            "key": "logout",      "disabled": false, "method": "post"}
+]
+</script>
+
+<!-- Command Palette Vanilla JS -->
+<script>
+(function() {
+  var PALETTE_ID  = 'cmd-palette';
+  var INPUT_ID    = 'cmd-input';
+  var LIST_ID     = 'cmd-items-container';
+  var selectedIdx = -1;
+  var filteredItems = [];
+  var ITEMS = [];
+
+  // Items aus JSON-Script-Tag laden (nach DOM ready)
+  function loadItems() {
+    try {
+      var el = document.getElementById('palette-items');
+      ITEMS = el ? JSON.parse(el.textContent) : [];
+    } catch(e) { ITEMS = []; }
+  }
+
+  // ── Oeffnen ────────────────────────────────────────────────────
+  function openPalette() {
+    var dialog = document.getElementById(PALETTE_ID);
+    if (!dialog) return;
+    selectedIdx = -1;
+    var inp = document.getElementById(INPUT_ID);
+    if (inp) inp.value = '';
+    renderItems('');
+    dialog.showModal();
+    setTimeout(function() {
+      var i = document.getElementById(INPUT_ID);
+      if (i) i.focus();
+    }, 10);
+  }
+
+  // ── Schliessen ─────────────────────────────────────────────────
+  function closePalette() {
+    var dialog = document.getElementById(PALETTE_ID);
+    if (dialog && dialog.open) dialog.close();
+    selectedIdx = -1;
+  }
+
+  // ── Einblend-Animation (scale 0.97 → 1.0, 120ms) ──────────────
+  document.addEventListener('DOMContentLoaded', function() {
+    loadItems();
+    renderItems(''); // Initial-Render
+    var dialog = document.getElementById(PALETTE_ID);
+    if (dialog) {
+      dialog.addEventListener('toggle', function(e) {
+        if (e.newState === 'open') {
+          this.style.transform = 'translateX(-50%) scale(0.97)';
+          this.style.opacity   = '0';
+          this.style.transition = 'none';
+          requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+              var d = document.getElementById(PALETTE_ID);
+              if (d) {
+                d.style.transition = 'transform 120ms ease, opacity 120ms ease';
+                d.style.transform  = 'translateX(-50%) scale(1.0)';
+                d.style.opacity    = '1';
+              }
+            });
+          });
+        }
+      });
+    }
+  });
+
+  // ── Keyboard: Cmd+K / Ctrl+K ───────────────────────────────────
+  document.addEventListener('keydown', function(e) {
+    var tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+    var inInput = (tag === 'input' || tag === 'textarea' || tag === 'select')
+                  && document.activeElement.id !== INPUT_ID;
+    if (inInput) return;
+
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      var dialog = document.getElementById(PALETTE_ID);
+      if (dialog && dialog.open) { closePalette(); } else { openPalette(); }
+      return;
+    }
+    if (e.key === 'Escape') {
+      closePalette();
+      return;
+    }
+
+    var dialog = document.getElementById(PALETTE_ID);
+    if (!dialog || !dialog.open) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      selectedIdx = Math.min(selectedIdx + 1, filteredItems.length - 1);
+      updateSelection();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      selectedIdx = Math.max(selectedIdx - 1, 0);
+      updateSelection();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      activateItem(selectedIdx);
+    }
+  });
+
+  // ── Backdrop-Klick schließt ────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function() {
+    var dialog = document.getElementById(PALETTE_ID);
+    if (dialog) {
+      dialog.addEventListener('click', function(e) {
+        if (e.target === this) closePalette();
+      });
+    }
+  });
+
+  // ── Filter (oninput) ──────────────────────────────────────────
+  window.cmdPaletteFilter = function(query) {
+    selectedIdx = 0;
+    renderItems(query);
+  };
+
+  // ── Items rendern ─────────────────────────────────────────────
+  function renderItems(query) {
+    var q = query.toLowerCase().trim();
+    filteredItems = q
+      ? ITEMS.filter(function(item) { return item.label.toLowerCase().indexOf(q) >= 0; })
+      : ITEMS;
+
+    var container = document.getElementById(LIST_ID);
+    if (!container) return;
+
+    var html = '';
+    var currentSection = '';
+
+    filteredItems.forEach(function(item, idx) {
+      if (item.section !== currentSection) {
+        currentSection = item.section;
+        html += '<div style="font-size:10px; font-weight:700; letter-spacing:0.16em;' +
+                'text-transform:uppercase; color:var(--text-muted);' +
+                'padding:8px 16px 4px;">' + item.section + '</div>';
+      }
+
+      var isSelected = idx === selectedIdx;
+      var isDisabled = item.disabled;
+
+      var baseStyle = 'display:flex; align-items:center; gap:10px;' +
+                      'padding:9px 16px; font-size:13px; font-weight:600;' +
+                      'cursor:' + (isDisabled ? 'default' : 'pointer') + ';' +
+                      'transition:background 0.08s;';
+
+      var activeStyle = (isSelected && !isDisabled)
+        ? 'background:rgba(255,251,118,0.06); color:var(--text-primary);'
+        : 'color:' + (isDisabled ? 'var(--text-muted)' : 'var(--text-secondary)') + ';';
+
+      var badge = isDisabled
+        ? '<span style="margin-left:auto; font-size:10px; color:var(--text-muted);">bald</span>'
+        : '';
+
+      html += '<div role="option"' +
+              ' data-idx="' + idx + '"' +
+              ' data-disabled="' + isDisabled + '"' +
+              ' style="' + baseStyle + ' ' + activeStyle + '"' +
+              ' onclick="cmdPaletteActivate(' + idx + ')"' +
+              ' onmouseover="cmdPaletteHover(' + idx + ')">' +
+              item.label + badge + '</div>';
+    });
+
+    container.innerHTML = html || '<div style="padding:16px; font-size:13px; color:var(--text-muted);">Keine Treffer</div>';
+  }
+
+  // ── Hover setzt selectedIdx ───────────────────────────────────
+  window.cmdPaletteHover = function(idx) {
+    selectedIdx = idx;
+    updateSelection();
+  };
+
+  // ── Selection-Highlight ───────────────────────────────────────
+  function updateSelection() {
+    var items = document.getElementById(LIST_ID);
+    if (!items) return;
+    var els = items.querySelectorAll('[data-idx]');
+    els.forEach(function(el, idx) {
+      var isDisabled = el.dataset.disabled === 'true';
+      if (idx === selectedIdx && !isDisabled) {
+        el.style.background = 'rgba(255,251,118,0.06)';
+        el.style.color = 'var(--text-primary)';
+        el.scrollIntoView({ block: 'nearest' });
+      } else {
+        el.style.background = 'transparent';
+        el.style.color = isDisabled ? 'var(--text-muted)' : 'var(--text-secondary)';
+      }
+    });
+  }
+
+  // ── Item aktivieren ───────────────────────────────────────────
+  window.cmdPaletteActivate = function(idx) { activateItem(idx); };
+
+  function activateItem(idx) {
+    var item = filteredItems[idx];
+    if (!item) return;
+    if (item.disabled) {
+      showToast('Kommt bald');
+      return;
+    }
+    closePalette();
+    if (item.method === 'post') {
+      var form = document.createElement('form');
+      form.method = 'POST'; form.action = item.path;
+      document.body.appendChild(form);
+      form.submit();
+    } else if (item.path) {
+      window.location.href = item.path;
+    }
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────
+  function showToast(msg) {
+    var existing = document.querySelector('.toast-msg');
+    if (existing) existing.remove();
+    var toast = document.createElement('div');
+    toast.className = 'toast-msg';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(function() { if (toast.parentNode) toast.remove(); }, 2500);
+  }
+
+  // ── Global API ────────────────────────────────────────────────
+  window.openCommandPalette  = openPalette;
+  window.closeCommandPalette = closePalette;
+
+})();
+</script>

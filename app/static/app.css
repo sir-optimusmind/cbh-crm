@@ -1,0 +1,249 @@
+/* CBH MISSION CTRL – CRM Shared CSS */
+/* Basis: ColdCall app.css (1:1 Variablen) + Neue Sprint-3-Wave-2-Klassen */
+
+/* ── Theme: Dark (Default) ────────────────────────────────────── */
+:root,
+[data-theme="dark"] {
+  --bg-base:     #1E1E1E;
+  --bg-nav:      #111111;
+  --bg-header:   #161616;
+  --bg-card:     #252525;
+  --bg-input:    #2A2A2A;
+  --bg-inset:    #1E1E1E;
+  --text-primary:   #E5E7EB;
+  --text-secondary: #9CA3AF;
+  --text-muted:     #6B7280;
+  --border:      #374151;
+  --border-sub:  #1F2937;
+  --accent-yellow: #FFFB76;
+  --accent-yellow-hover: #FFF176;
+  --accent-blue:   #5870E2;
+  --status-success: #22C55E;
+  --status-warning: #F59E0B;
+  --status-error:   #EF4444;
+  --status-info:    #5870E2;
+  --scrollbar-track: #2A2A2A;
+  --scrollbar-thumb: #4B5563;
+  --kpi-number:  #FFFFFF;
+
+  /* Sprint 3 Wave 2 – Neue Layout-Variablen */
+  --sidebar-width:     220px;
+  --topbar-height:     52px;
+  --breadcrumb-height: 36px;
+}
+
+/* ── Theme: Light ─────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-base:     #F4F5F7;
+  --bg-nav:      #FFFFFF;
+  --bg-header:   #FFFFFF;
+  --bg-card:     #FFFFFF;
+  --bg-input:    #F0F1F3;
+  --bg-inset:    #F4F5F7;
+  --text-primary:   #111827;
+  --text-secondary: #374151;
+  --text-muted:     #6B7280;
+  --border:      #E5E7EB;
+  --border-sub:  #F3F4F6;
+  --accent-yellow: #D4A017;
+  --accent-yellow-hover: #B8860B;
+  --accent-blue:   #3B5CE0;
+  --status-success: #16A34A;
+  --status-warning: #D97706;
+  --status-error:   #DC2626;
+  --status-info:    #3B5CE0;
+  --scrollbar-track: #E5E7EB;
+  --scrollbar-thumb: #9CA3AF;
+  --kpi-number:  #111827;
+
+  /* Sprint 3 Wave 2 – identische Werte */
+  --sidebar-width:     220px;
+  --topbar-height:     52px;
+  --breadcrumb-height: 36px;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── HTMX Indicator ───────────────────────────────────────────── */
+.htmx-indicator { display: none; }
+.htmx-request .htmx-indicator { display: inline; }
+.htmx-request.htmx-indicator { display: inline; }
+
+/* ── Toast notification (1:1 ColdCall) ───────────────────────── */
+.toast-msg {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 0.75rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-family: Barlow, sans-serif;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Theme Switcher ───────────────────────────────────────────── */
+.theme-switcher {
+  display: flex;
+  background: var(--bg-input);
+  border-radius: 9999px;
+  padding: 2px;
+  gap: 0;
+}
+.theme-switcher button {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  transition: all 150ms;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.theme-switcher button:hover { color: var(--text-secondary); }
+.theme-switcher button.active { background: var(--accent-blue); color: #FFFFFF; }
+
+/* ── Section Label ────────────────────────────────────────────── */
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-left: 12px;
+  margin-bottom: 6px;
+  margin-top: 20px;
+}
+.section-label:first-child { margin-top: 0; }
+
+/* ── Tile Grid ────────────────────────────────────────────────── */
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 1200px) { .tile-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px)  { .tile-grid { grid-template-columns: 1fr; } }
+
+/* ── Tile Card ────────────────────────────────────────────────── */
+.tile-card {
+  background: var(--bg-header);
+  border: 1px solid var(--border-sub);
+  border-radius: 10px;
+  padding: 22px;
+  text-decoration: none;
+  display: block;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.tile-card:hover {
+  border-color: var(--accent-yellow);
+  box-shadow: 0 0 0 1px var(--accent-yellow), 0 4px 24px rgba(255,251,118,0.06);
+}
+.tile-card-disabled {
+  background: var(--bg-header);
+  border: 1px solid var(--border-sub);
+  border-radius: 10px;
+  padding: 22px;
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* ── KPI Card ─────────────────────────────────────────────────── */
+.kpi-card {
+  background: var(--bg-header);
+  border: 1px solid var(--border-sub);
+  border-radius: 10px;
+  padding: 20px 22px;
+}
+
+/* ── Status Badges ────────────────────────────────────────────── */
+.badge-aktiv {
+  font-size: 11px; font-weight: 700; padding: 3px 10px;
+  border-radius: 4px; letter-spacing: 0.05em;
+  background: rgba(22,163,74,0.12); color: var(--status-success);
+}
+.badge-soon {
+  font-size: 11px; font-weight: 700; padding: 3px 10px;
+  border-radius: 4px; letter-spacing: 0.05em;
+  background: rgba(107,114,128,0.15); color: var(--text-muted);
+}
+
+/* ── Avatar ───────────────────────────────────────────────────── */
+.avatar { flex-shrink: 0; }
+.avatar-color-0 { background: var(--accent-blue); }
+.avatar-color-1 { background: #7C5CE0; }
+.avatar-color-2 { background: #E05870; }
+.avatar-color-3 { background: #22C55E; }
+.avatar-color-4 { background: #F59E0B; }
+.avatar-color-5 { background: #2FCFCA; }
+
+/* ── Command Palette ──────────────────────────────────────────── */
+#cmd-list::-webkit-scrollbar { width: 4px; }
+#cmd-list::-webkit-scrollbar-track { background: transparent; }
+#cmd-list::-webkit-scrollbar-thumb { background: var(--border-sub); border-radius: 2px; }
+
+/* ── Sidebar ──────────────────────────────────────────────────── */
+/* Desktop: permanent sichtbar */
+@media (min-width: 1025px) {
+  #sidebar {
+    transform: none !important;
+    transition: none;
+  }
+  #sidebar-backdrop { display: none !important; }
+  main { margin-left: var(--sidebar-width); }
+}
+
+/* Mobile Drawer */
+@media (max-width: 1024px) {
+  #sidebar {
+    width: 260px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 1000;
+  }
+  #sidebar.open { transform: translateX(0); }
+  #sidebar-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+  }
+  #sidebar-backdrop.visible { display: block; }
+  main { margin-left: 0 !important; }
+  .hamburger-btn { display: flex !important; }
+}
+@media (min-width: 1025px) {
+  .hamburger-btn { display: none !important; }
+}
+
+/* ── Existing CRM Utility Styles ──────────────────────────────── */
+.btn-primary { background: var(--accent-yellow); color: #1E1E1E; font-weight: 600; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; text-decoration: none; display: inline-block; }
+.btn-primary:hover { background: var(--accent-yellow-hover); }
+.btn-secondary { background: var(--bg-card); color: var(--text-primary); font-weight: 600; padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; text-decoration: none; display: inline-block; }
+.btn-secondary:hover { background: var(--bg-input); }
+.btn-danger { background: var(--status-error); color: #fff; font-weight: 600; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; text-decoration: none; display: inline-block; }
+.btn-danger:hover { opacity: 0.85; }
+.btn-sm { padding: 4px 10px; font-size: 13px; }
+
+.flash-success { background: rgba(5,150,105,0.15); border: 1px solid #059669; color: var(--status-success); padding: 10px 16px; border-radius: 6px; margin-bottom: 16px; }
+.flash-error { background: rgba(220,38,38,0.15); border: 1px solid var(--status-error); color: #FCA5A5; padding: 10px 16px; border-radius: 6px; margin-bottom: 16px; }
+
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge-blue { background: rgba(88,112,226,0.2); color: var(--accent-blue); }
+.badge-yellow { background: rgba(255,251,118,0.15); color: var(--accent-yellow); }
+.badge-green { background: rgba(5,150,105,0.2); color: #34D399; }
+.badge-red { background: rgba(220,38,38,0.2); color: #FCA5A5; }
+.badge-orange { background: rgba(234,88,12,0.2); color: #FB923C; }
+
+/* Date input dark mode */
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; }
+[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator { filter: none; opacity: 0.6; }
