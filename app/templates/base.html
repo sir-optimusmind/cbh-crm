@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}CBH MISSION CTRL – CRM{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'cbh-dark':   '#1E1E1E',
+            'cbh-yellow': '#FFFB76',
+            'cbh-blue':   '#5870E2',
+          },
+          fontFamily: {
+            'barlow': ['Barlow', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Barlow', sans-serif; background: #1E1E1E; color: #F0F0F0; }
+    .btn-primary { background: #FFFB76; color: #1E1E1E; font-weight: 600; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn-primary:hover { background: #f0ec60; }
+    .btn-secondary { background: #2a2a2a; color: #F0F0F0; font-weight: 600; padding: 8px 16px; border-radius: 6px; border: 1px solid #3a3a3a; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn-secondary:hover { background: #333; }
+    .btn-danger { background: #DC2626; color: #fff; font-weight: 600; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-sm { padding: 4px 10px; font-size: 13px; }
+    input, select, textarea { background: #2a2a2a; border: 1px solid #3a3a3a; color: #F0F0F0; padding: 8px 12px; border-radius: 6px; width: 100%; box-sizing: border-box; font-family: 'Barlow', sans-serif; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #5870E2; }
+    label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 13px; color: #aaa; }
+    .form-group { margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 10px 12px; background: #252525; font-size: 12px; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid #333; }
+    td { padding: 10px 12px; border-bottom: 1px solid #2a2a2a; font-size: 14px; }
+    tr:hover td { background: #252525; }
+    .card { background: #252525; border: 1px solid #333; border-radius: 8px; padding: 20px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-blue { background: rgba(88,112,226,0.2); color: #5870E2; }
+    .badge-yellow { background: rgba(255,251,118,0.15); color: #FFFB76; }
+    .badge-green { background: rgba(5,150,105,0.2); color: #34D399; }
+    .flash-success { background: rgba(5,150,105,0.15); border: 1px solid #059669; color: #34D399; padding: 10px 16px; border-radius: 6px; margin-bottom: 16px; }
+    .flash-error { background: rgba(220,38,38,0.15); border: 1px solid #DC2626; color: #FCA5A5; padding: 10px 16px; border-radius: 6px; margin-bottom: 16px; }
+    #htmx-indicator { display: none; position: fixed; top: 0; left: 0; right: 0; height: 3px; background: #FFFB76; z-index: 9999; }
+    .htmx-request #htmx-indicator { display: block; }
+  </style>
+</head>
+<body>
+  <div id="htmx-indicator"></div>
+
+  <!-- Header -->
+  <header style="background:#1a1a1a; border-bottom:1px solid #333; padding:12px 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:50;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="font-weight:900; font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:#F0F0F0;">CBH</span>
+      <span style="color:#444; font-size:12px;">|</span>
+      <span style="font-weight:900; font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:#FFFB76;">MISSION CTRL</span>
+      <span style="color:#444; font-size:12px;">|</span>
+      <span style="font-weight:600; font-size:13px; letter-spacing:0.08em; text-transform:uppercase; color:#aaa;">CRM</span>
+    </div>
+    <nav style="display:flex; align-items:center; gap:20px;">
+      <a href="{{ prefix }}/personen" style="color:#aaa; text-decoration:none; font-size:13px; font-weight:600;" onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'">Personen</a>
+      <a href="{{ prefix }}/unternehmen" style="color:#aaa; text-decoration:none; font-size:13px; font-weight:600;" onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'">Unternehmen</a>
+    </nav>
+  </header>
+
+  <!-- Main -->
+  <main style="max-width:1200px; margin:0 auto; padding:24px;">
+    {% if flash_success %}
+    <div class="flash-success">{{ flash_success }}</div>
+    {% endif %}
+    {% if flash_error %}
+    <div class="flash-error">{{ flash_error }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

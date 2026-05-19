@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}{{ unternehmen.name }} – CBH CRM{% endblock %}
+{% block content %}
+<!-- Breadcrumb -->
+<div style="margin-bottom:16px; font-size:13px; color:#aaa;">
+  <a href="{{ prefix }}/unternehmen" style="color:#aaa; text-decoration:none;">Unternehmen</a>
+  <span style="margin:0 8px;">›</span>
+  <span style="color:#F0F0F0; font-weight:600;">{{ unternehmen.name }}</span>
+</div>
+
+<!-- Header Row -->
+<div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+  <div>
+    <h1 style="font-size:26px; font-weight:700; margin:0 0 4px 0;">{{ unternehmen.name }}</h1>
+    {% if unternehmen.branche %}
+    <span class="badge badge-blue">{{ unternehmen.branche }}</span>
+    {% endif %}
+  </div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <a href="{{ prefix }}/unternehmen/{{ unternehmen.id }}/edit" class="btn-primary">Bearbeiten</a>
+    <button
+      hx-delete="{{ prefix }}/unternehmen/{{ unternehmen.id }}"
+      hx-confirm="Unternehmen wirklich löschen? (Soft-Delete)"
+      hx-target="#delete-result"
+      hx-swap="innerHTML"
+      class="btn-danger">Löschen</button>
+  </div>
+</div>
+<div id="delete-result"></div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
+  <!-- Stammdaten -->
+  <div class="card">
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Firmendaten</div>
+
+    <div style="display:grid; grid-template-columns:140px 1fr; gap:8px 12px; font-size:14px;">
+      <div style="color:#aaa; font-weight:600;">Branche</div>
+      <div>{% if unternehmen.branche %}<span class="badge badge-blue">{{ unternehmen.branche }}</span>{% else %}–{% endif %}</div>
+
+      <div style="color:#aaa; font-weight:600;">Mitarbeiter</div>
+      <div>{{ unternehmen.groesse_ma or '–' }}</div>
+
+      <div style="color:#aaa; font-weight:600;">Website</div>
+      <div>{% if unternehmen.website %}<a href="{{ unternehmen.website }}" target="_blank" style="color:#5870E2;">{{ unternehmen.website }}</a>{% else %}–{% endif %}</div>
+    </div>
+
+    {% if unternehmen.notes %}
+    <div style="margin-top:16px; padding-top:16px; border-top:1px solid #333;">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:8px;">Notizen</div>
+      <div style="font-size:14px; color:#ddd; line-height:1.5; white-space:pre-wrap;">{{ unternehmen.notes }}</div>
+    </div>
+    {% endif %}
+
+    <div style="margin-top:16px; padding-top:16px; border-top:1px solid #333; font-size:12px; color:#666; display:grid; grid-template-columns:auto 1fr; gap:4px 12px;">
+      <span>Angelegt:</span><span>{{ unternehmen.created_at[:16].replace('T',' ') if unternehmen.created_at else '–' }} UTC</span>
+      <span>Geändert:</span><span>{{ unternehmen.updated_at[:16].replace('T',' ') if unternehmen.updated_at else '–' }} UTC</span>
+    </div>
+
+    <!-- Financials/News Platzhalter Sprint 2 -->
+    <div style="margin-top:16px; padding-top:16px; border-top:1px solid #333;">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:6px;">Financials / News</div>
+      <div style="color:#555; font-size:12px; font-style:italic;">Folgt in Sprint 2.</div>
+    </div>
+  </div>
+
+  <!-- Verknüpfte Personen (CRM-007) -->
+  <div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa;">Personen ({{ verknuepfungen|length }})</div>
+      <button onclick="document.getElementById('link-person-panel').style.display='block'; this.style.display='none';"
+              class="btn-secondary btn-sm">+ Verknüpfen</button>
+    </div>
+
+    {% if verknuepfungen %}
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      {% for v in verknuepfungen %}
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#2a2a2a; border-radius:6px;">
+        <div>
+          <a href="{{ prefix }}/personen/{{ v.person_id }}" style="color:#5870E2; text-decoration:none; font-weight:600;">{{ v.vorname }} {{ v.nachname }}</a>
+          {% if v.rolle %}<span style="color:#aaa; font-size:12px; margin-left:8px;">{{ v.rolle }}</span>{% endif %}
+          {% if v.primary_company %}<span class="badge badge-yellow" style="margin-left:8px;">Primary</span>{% endif %}
+        </div>
+        <button
+          hx-delete="{{ prefix }}/unternehmen/{{ unternehmen.id }}/personen/{{ v.person_id }}"
+          hx-confirm="Verknüpfung auflösen?"
+          hx-target="body" hx-swap="outerHTML"
+          class="btn-danger btn-sm">×</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="color:#666; font-size:13px;">Noch keine Personen verknüpft.</div>
+    {% endif %}
+
+    <!-- Verknüpfungs-Panel -->
+    <div id="link-person-panel" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid #333;">
+      <form
+        hx-post="{{ prefix }}/unternehmen/{{ unternehmen.id }}/personen"
+        hx-target="body" hx-swap="outerHTML">
+        <div class="form-group">
+          <label>Person wählen</label>
+          <select name="person_id" required>
+            <option value="">– wählen –</option>
+            {% for p in alle_personen %}
+            <option value="{{ p.id }}">{{ p.vorname }} {{ p.nachname }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Rolle (optional)</label>
+          <input type="text" name="rolle" placeholder="z.B. Ansprechpartner, Entscheider">
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button type="submit" class="btn-primary btn-sm">Verknüpfen</button>
+          <button type="button" onclick="document.getElementById('link-person-panel').style.display='none'" class="btn-secondary btn-sm">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.body.addEventListener('htmx:afterRequest', function(evt) {
+  var resp = evt.detail.xhr;
+  if (resp.status === 200) {
+    try {
+      var data = JSON.parse(resp.responseText);
+      if (data.redirect) window.location.href = data.redirect;
+    } catch(e) {}
+  }
+});
+</script>
+{% endblock %}

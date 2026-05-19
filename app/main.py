@@ -3,27 +3,33 @@ main.py – CBH MISSION CTRL CRM Module
 FastAPI App – Sprint 1
 
 APP_PREFIX kommt aus .env (PFLICHT, nie hardcoden).
-Default '/crm-staging' ist sicher fuer Staging.
 """
 
 import os
-import sys
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
 from app.db import init_db
+from app.routes.personen import router as personen_router
+from app.routes.unternehmen import router as unternehmen_router
 
 # ─── Konfiguration aus .env ───────────────────────────────────────────────────
-# APP_PREFIX MUSS aus .env kommen. Kein Hardcoding. Kein Exception.
 APP_PREFIX = os.getenv("APP_PREFIX", "/crm-staging").rstrip("/")
 CRM_ENV    = os.getenv("CRM_ENV", "staging")
+
+_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
+_STATIC_DIR   = os.path.join(os.path.dirname(__file__), "static")
+
+templates = Jinja2Templates(directory=_TEMPLATE_DIR)
 
 
 # ─── Startup / Shutdown ───────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """DB-Schema beim Start anlegen (idempotent)."""
     init_db()
     yield
 
@@ -37,9 +43,19 @@ app = FastAPI(
     root_path=APP_PREFIX,
 )
 
+# Router einbinden
+app.include_router(personen_router)
+app.include_router(unternehmen_router)
 
-# ─── Health-Check (CRM-002 Akzeptanzkriterium) ───────────────────────────────
+
+# ─── Health-Check ─────────────────────────────────────────────────────────────
 @app.get("/health")
 async def health():
-    """GET /crm-staging/health → {"status": "ok", "env": "staging"}"""
     return JSONResponse({"status": "ok", "env": CRM_ENV})
+
+
+# ─── Root Redirect → /personen ────────────────────────────────────────────────
+@app.get("/")
+async def root(request: Request):
+    prefix = request.scope.get("root_path", "")
+    return RedirectResponse(url=f"{prefix}/personen", status_code=302)

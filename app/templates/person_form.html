@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Person bearbeiten' if person else 'Neue Person' }} – CBH CRM{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+  <a href="{{ prefix }}/personen{% if person %}/{{ person.id }}{% endif %}" style="color:#aaa; text-decoration:none; font-size:13px;">← Zurück</a>
+  <h1 style="font-size:22px; font-weight:700; margin:0;">{{ 'Person bearbeiten' if person else 'Neue Person anlegen' }}</h1>
+</div>
+
+<div class="card" style="max-width:680px;">
+  <form
+    {% if person %}
+    hx-put="{{ prefix }}/personen/{{ person.id }}"
+    {% else %}
+    hx-post="{{ prefix }}/personen"
+    {% endif %}
+    hx-target="#form-result"
+    hx-swap="innerHTML"
+    style="margin:0;">
+
+    <div id="form-result"></div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div class="form-group">
+        <label>Vorname *</label>
+        <input type="text" name="vorname" value="{{ person.vorname if person else '' }}" required placeholder="Max">
+      </div>
+      <div class="form-group">
+        <label>Nachname *</label>
+        <input type="text" name="nachname" value="{{ person.nachname if person else '' }}" required placeholder="Mustermann">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>E-Mail</label>
+      <input type="email" name="email" value="{{ person.email if person else '' }}" placeholder="max@firma.de">
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div class="form-group">
+        <label>Telefon</label>
+        <input type="text" name="telefon" value="{{ person.telefon if person else '' }}" placeholder="+49 89 123456">
+      </div>
+      <div class="form-group">
+        <label>Position</label>
+        <input type="text" name="position" value="{{ person.position if person else '' }}" placeholder="Head of Sales">
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div class="form-group">
+        <label>Prospect Level</label>
+        <select name="prospect_level">
+          <option value="">– wählen –</option>
+          {% for level in ['Owner','CxO','Head','Manager','Other'] %}
+          <option value="{{ level }}" {% if person and person.prospect_level == level %}selected{% endif %}>{{ level }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Owner (Zuständiger)</label>
+        <select name="created_by">
+          <option value="">– wählen –</option>
+          {% for o in owners %}
+          <option value="{{ o }}" {% if person and person.created_by == o %}selected{% elif not person and o == 'christian' %}selected{% endif %}>{{ o }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Notizen</label>
+      <textarea name="notes" rows="3" placeholder="Freie Notizen...">{{ person.notes if person else '' }}</textarea>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:8px;">
+      <button type="submit" class="btn-primary">{{ 'Speichern' if person else 'Anlegen' }}</button>
+      <a href="{{ prefix }}/personen{% if person %}/{{ person.id }}{% endif %}" class="btn-secondary">Abbrechen</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+// Nach erfolgreichem HTMX-Submit: Redirect auf Detail-Seite
+document.body.addEventListener('htmx:afterRequest', function(evt) {
+  var resp = evt.detail.xhr;
+  if (resp.status === 200 || resp.status === 201) {
+    try {
+      var data = JSON.parse(resp.responseText);
+      if (data.redirect) window.location.href = data.redirect;
+    } catch(e) {}
+  }
+});
+</script>
+{% endblock %}

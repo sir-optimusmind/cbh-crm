@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Unternehmen – CBH CRM{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <h1 style="font-size:22px; font-weight:700; margin:0;">Unternehmen</h1>
+  <a href="{{ prefix }}/unternehmen/neu" class="btn-primary">+ Unternehmen anlegen</a>
+</div>
+
+<!-- Such-/Filterleiste -->
+<div class="card" style="margin-bottom:16px; padding:14px 20px;">
+  <form method="get" action="{{ prefix }}/unternehmen" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+    <div style="flex:1; min-width:200px;">
+      <label>Suche (Name)</label>
+      <input type="text" name="q" value="{{ q or '' }}" placeholder="Firma GmbH">
+    </div>
+    <div style="min-width:160px;">
+      <label>Branche</label>
+      <select name="branche">
+        <option value="">Alle</option>
+        {% for b in branchen %}
+        <option value="{{ b }}" {% if branche_filter == b %}selected{% endif %}>{{ b }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <button type="submit" class="btn-secondary">Filtern</button>
+      {% if q or branche_filter %}
+      <a href="{{ prefix }}/unternehmen" class="btn-secondary" style="margin-left:8px;">Zurücksetzen</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- Tabelle -->
+<div class="card" style="padding:0; overflow:hidden;">
+  {% if unternehmen_list %}
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Branche</th>
+        <th>Größe (MA)</th>
+        <th>Website</th>
+        <th>Angelegt</th>
+        <th style="width:120px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in unternehmen_list %}
+      <tr>
+        <td>
+          <a href="{{ prefix }}/unternehmen/{{ u.id }}" style="color:#FFFB76; text-decoration:none; font-weight:600;">{{ u.name }}</a>
+        </td>
+        <td>{% if u.branche %}<span class="badge badge-blue">{{ u.branche }}</span>{% else %}–{% endif %}</td>
+        <td style="color:#aaa;">{{ u.groesse_ma or '–' }}</td>
+        <td>{% if u.website %}<a href="{{ u.website }}" target="_blank" style="color:#5870E2; font-size:12px;">{{ u.website | truncate(30) }}</a>{% else %}–{% endif %}</td>
+        <td style="color:#aaa; font-size:12px;">{{ u.created_at[:10] if u.created_at else '–' }}</td>
+        <td style="text-align:right;">
+          <a href="{{ prefix }}/unternehmen/{{ u.id }}" class="btn-secondary btn-sm">Detail</a>
+          <a href="{{ prefix }}/unternehmen/{{ u.id }}/edit" class="btn-secondary btn-sm" style="margin-left:4px;">Edit</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:40px; text-align:center; color:#aaa;">
+    {% if q or branche_filter %}
+    Keine Unternehmen gefunden.
+    {% else %}
+    Noch keine Unternehmen angelegt. <a href="{{ prefix }}/unternehmen/neu" style="color:#FFFB76;">Erstes Unternehmen anlegen →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

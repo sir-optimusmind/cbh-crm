@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Personen – CBH CRM{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <h1 style="font-size:22px; font-weight:700; margin:0;">Personen</h1>
+  <a href="{{ prefix }}/personen/neu" class="btn-primary">+ Person anlegen</a>
+</div>
+
+<!-- Such-/Filterleiste -->
+<div class="card" style="margin-bottom:16px; padding:14px 20px;">
+  <form method="get" action="{{ prefix }}/personen" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+    <div style="flex:1; min-width:200px;">
+      <label>Suche (Name / E-Mail)</label>
+      <input type="text" name="q" value="{{ q or '' }}" placeholder="Max Mustermann oder max@firma.de">
+    </div>
+    <div style="min-width:160px;">
+      <label>Owner</label>
+      <select name="owner">
+        <option value="">Alle</option>
+        {% for o in owners %}
+        <option value="{{ o }}" {% if owner_filter == o %}selected{% endif %}>{{ o }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <button type="submit" class="btn-secondary">Filtern</button>
+      {% if q or owner_filter %}
+      <a href="{{ prefix }}/personen" class="btn-secondary" style="margin-left:8px;">Zurücksetzen</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- Personen-Tabelle -->
+<div class="card" style="padding:0; overflow:hidden;">
+  {% if personen %}
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>E-Mail</th>
+        <th>Position</th>
+        <th>Primäre Firma</th>
+        <th>Owner</th>
+        <th>Angelegt</th>
+        <th style="width:120px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in personen %}
+      <tr>
+        <td>
+          <a href="{{ prefix }}/personen/{{ p.id }}" style="color:#FFFB76; text-decoration:none; font-weight:600;">
+            {{ p.vorname }} {{ p.nachname }}
+          </a>
+        </td>
+        <td style="color:#aaa;">{{ p.email or '–' }}</td>
+        <td>{{ p.position or '–' }}</td>
+        <td>
+          {% if p.primary_company_name %}
+          <a href="{{ prefix }}/unternehmen/{{ p.primary_company_id }}" style="color:#5870E2; text-decoration:none;">{{ p.primary_company_name }}</a>
+          {% else %}–{% endif %}
+        </td>
+        <td>
+          {% if p.created_by %}
+          <span class="badge badge-blue">{{ p.created_by }}</span>
+          {% else %}–{% endif %}
+        </td>
+        <td style="color:#aaa; font-size:12px;">{{ p.created_at[:10] if p.created_at else '–' }}</td>
+        <td style="text-align:right;">
+          <a href="{{ prefix }}/personen/{{ p.id }}" class="btn-secondary btn-sm">Detail</a>
+          <a href="{{ prefix }}/personen/{{ p.id }}/edit" class="btn-secondary btn-sm" style="margin-left:4px;">Edit</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:40px; text-align:center; color:#aaa;">
+    {% if q or owner_filter %}
+    Keine Personen gefunden für "{{ q or owner_filter }}".
+    {% else %}
+    Noch keine Personen angelegt. <a href="{{ prefix }}/personen/neu" style="color:#FFFB76;">Erste Person anlegen →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
