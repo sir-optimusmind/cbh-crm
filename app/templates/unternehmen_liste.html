@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Unternehmen – CBH CRM{% endblock %}
 {% block content %}
+{% include '_crm_subnav.html' %}
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
   <h1 style="font-size:22px; font-weight:700; margin:0;">Unternehmen</h1>
   <a href="{{ prefix }}/unternehmen/neu" class="btn-primary">+ Unternehmen anlegen</a>

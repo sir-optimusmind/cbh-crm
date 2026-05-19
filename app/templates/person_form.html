@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Person bearbeiten' if person else 'Neue Person' }} – CBH CRM{% endblock %}
 {% block content %}
+{% include '_crm_subnav.html' %}
 <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
   <a href="{{ prefix }}/personen{% if person %}/{{ person.id }}{% endif %}" class="btn-secondary btn-sm">← Abbrechen</a>
   <h1 style="font-size:22px; font-weight:700; margin:0;">{{ 'Person bearbeiten' if person else 'Neue Person anlegen' }}</h1>

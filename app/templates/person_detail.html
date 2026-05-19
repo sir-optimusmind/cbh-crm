@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ person.vorname }} {{ person.nachname }} – CBH CRM{% endblock %}
 {% block content %}
+{% include '_crm_subnav.html' %}
 <!-- Zurück-Button (CRM-018) -->
 <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
   <a href="{{ prefix }}/personen" class="btn-secondary btn-sm">← Personen</a>
@@ -134,7 +135,7 @@
         {% for v in verknuepfungen %}
         <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#2a2a2a; border-radius:4px;">
           <div>
-            <a href="{{ prefix }}/unternehmen/{{ v.unternehmen_id }}" style="color:#5870E2; text-decoration:none; font-size:13px; font-weight:600;">{{ v.name }}</a>
+            <a href="{{ prefix }}/unternehmen/{{ v.unternehmen_id }}" style="color:#5870E2; text-decoration:none; font-size:13px; font-weight:600;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ v.name }}</a>
             {% if v.rolle %}<div style="color:#777; font-size:11px;">{{ v.rolle }}</div>{% endif %}
             {% if v.primary_company %}<span class="badge badge-yellow" style="font-size:10px;">Primary</span>{% endif %}
           </div>

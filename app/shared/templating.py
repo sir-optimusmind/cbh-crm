@@ -140,11 +140,20 @@ def render(request: Request, template: str, **ctx):
     current_user = _get_current_user(request)
     now_hour = datetime.now(timezone.utc).hour
 
+    # CRM Sub-Nav Tab: personen oder unternehmen (Longest-Prefix)
+    if f"{APP_PREFIX}/unternehmen" in path:
+        crm_tab = "unternehmen"
+    elif f"{APP_PREFIX}/personen" in path or f"{APP_PREFIX}/touchpoints" in path:
+        crm_tab = "personen"
+    else:
+        crm_tab = "personen"
+
     return templates.TemplateResponse(request, template, {
         "request":      request,
         "prefix":       request.scope.get("root_path", APP_PREFIX),
         "nav_items":    NAV_ITEMS,
         "active_key":   active_key,
+        "crm_tab":      crm_tab,
         "breadcrumb":   breadcrumb,
         "current_user": current_user,
         "now_hour":     now_hour,

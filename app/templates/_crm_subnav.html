@@ -1,0 +1,37 @@
+{# _crm_subnav.html – CRM Sub-Navigation (Personen | Unternehmen)
+   Erwartet im Context: crm_tab ('personen' oder 'unternehmen'), prefix
+   Einbindung: {% include '_crm_subnav.html' %}
+#}
+<div style="display:flex; align-items:center; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border-sub); padding-bottom:0;">
+
+  {% set p_active = crm_tab == 'personen' %}
+  <a href="{{ prefix }}/personen"
+     style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; font-size:13px; font-weight:600; text-decoration:none; border-bottom:2px solid {% if p_active %}var(--accent-yellow){% else %}transparent{% endif %}; color:{% if p_active %}var(--text-primary){% else %}var(--text-muted){% endif %}; margin-bottom:-1px; transition:color 0.12s, border-color 0.12s;"
+     {% if not p_active %}
+     onmouseover="this.style.color='var(--text-primary)'; this.style.borderBottomColor='rgba(255,251,118,0.4)'"
+     onmouseout="this.style.color='var(--text-muted)'; this.style.borderBottomColor='transparent'"
+     {% endif %}
+     {% if p_active %}aria-current="page"{% endif %}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+      <circle cx="12" cy="7" r="4"/>
+    </svg>
+    Personen
+  </a>
+
+  {% set u_active = crm_tab == 'unternehmen' %}
+  <a href="{{ prefix }}/unternehmen"
+     style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; font-size:13px; font-weight:600; text-decoration:none; border-bottom:2px solid {% if u_active %}var(--accent-yellow){% else %}transparent{% endif %}; color:{% if u_active %}var(--text-primary){% else %}var(--text-muted){% endif %}; margin-bottom:-1px; transition:color 0.12s, border-color 0.12s;"
+     {% if not u_active %}
+     onmouseover="this.style.color='var(--text-primary)'; this.style.borderBottomColor='rgba(255,251,118,0.4)'"
+     onmouseout="this.style.color='var(--text-muted)'; this.style.borderBottomColor='transparent'"
+     {% endif %}
+     {% if u_active %}aria-current="page"{% endif %}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+    </svg>
+    Unternehmen
+  </a>
+
+</div>

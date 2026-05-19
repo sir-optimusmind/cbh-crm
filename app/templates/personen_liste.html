@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Personen – CBH CRM{% endblock %}
 {% block content %}
+{% include '_crm_subnav.html' %}
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
   <h1 style="font-size:22px; font-weight:700; margin:0;">Personen</h1>
   <a href="{{ prefix }}/personen/neu" class="btn-primary">+ Person anlegen</a>
@@ -91,7 +92,7 @@
         <td style="color:#aaa; font-size:12px;">{{ p.last_contact_at[:10] if p.last_contact_at else '–' }}</td>
         <td>
           {% if p.primary_company_name %}
-          <a href="{{ prefix }}/unternehmen/{{ p.primary_company_id }}" style="color:#5870E2; text-decoration:none;">{{ p.primary_company_name }}</a>
+          <a href="{{ prefix }}/unternehmen/{{ p.primary_company_id }}" style="color:#5870E2; text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ p.primary_company_name }}</a>
           {% else %}–{% endif %}
         </td>
         <td>

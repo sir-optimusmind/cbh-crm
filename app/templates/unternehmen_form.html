@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Unternehmen bearbeiten' if unternehmen else 'Neues Unternehmen' }} – CBH CRM{% endblock %}
 {% block content %}
+{% include '_crm_subnav.html' %}
 <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
   <a href="{{ prefix }}/unternehmen{% if unternehmen %}/{{ unternehmen.id }}{% endif %}" class="btn-secondary btn-sm">← Abbrechen</a>
   <h1 style="font-size:22px; font-weight:700; margin:0;">{{ 'Unternehmen bearbeiten' if unternehmen else 'Neues Unternehmen anlegen' }}</h1>
