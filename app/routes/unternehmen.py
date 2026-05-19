@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from app.db import get_connection, write_audit_log, now_iso
+from app.template_utils import tmpl_ctx
 
 router = APIRouter()
 
@@ -71,13 +72,14 @@ def unternehmen_liste(request: Request, q: str = "", branche: str = ""):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "unternehmen_liste.html", {
+    return templates.TemplateResponse(request, "unternehmen_liste.html", tmpl_ctx(request, {
         "prefix": prefix,
         "unternehmen_list": [dict(r) for r in rows],
         "q": q,
         "branche_filter": branche,
         "branchen": BRANCHEN,
-    })
+    }))
+
 
 
 # ─── Anlegen-Form ─────────────────────────────────────────────────────────────
@@ -85,12 +87,13 @@ def unternehmen_liste(request: Request, q: str = "", branche: str = ""):
 @router.get("/unternehmen/neu", response_class=HTMLResponse)
 def unternehmen_neu_form(request: Request):
     prefix = request.scope.get("root_path", "")
-    return templates.TemplateResponse(request, "unternehmen_form.html", {
+    return templates.TemplateResponse(request, "unternehmen_form.html", tmpl_ctx(request, {
         "prefix": prefix,
         "unternehmen": None,
         "branchen": BRANCHEN,
         "produkte": PRODUKTE,
-    })
+    }))
+
 
 
 # ─── POST Anlegen ─────────────────────────────────────────────────────────────
@@ -250,7 +253,7 @@ def unternehmen_detail(request: Request, unternehmen_id: int):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "unternehmen_detail.html", {
+    return templates.TemplateResponse(request, "unternehmen_detail.html", tmpl_ctx(request, {
         "prefix": prefix,
         "unternehmen": unternehmen,
         "verknuepfungen": verknuepfungen,
@@ -261,7 +264,8 @@ def unternehmen_detail(request: Request, unternehmen_id: int):
         "news_list": news_list,
         "branchen": BRANCHEN,
         "produkte": PRODUKTE,
-    })
+    }))
+
 
 
 # ─── Edit-Form ────────────────────────────────────────────────────────────────
@@ -280,12 +284,13 @@ def unternehmen_edit_form(request: Request, unternehmen_id: int):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "unternehmen_form.html", {
+    return templates.TemplateResponse(request, "unternehmen_form.html", tmpl_ctx(request, {
         "prefix": prefix,
         "unternehmen": unternehmen,
         "branchen": BRANCHEN,
         "produkte": PRODUKTE,
-    })
+    }))
+
 
 
 # ─── PUT Full Replacement (CRM-022) ──────────────────────────────────────────

@@ -17,6 +17,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from app.db import get_connection, write_audit_log, now_iso
+from app.template_utils import tmpl_ctx
 
 router = APIRouter()
 _TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
@@ -96,13 +97,14 @@ async def projects_liste(request: Request, status: Optional[str] = None):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "projects_liste.html", {
+    return templates.TemplateResponse(request, "projects_liste.html", tmpl_ctx(request, {
         "request": request,
         "prefix": prefix,
         "projects": projects,
         "statuses": PROJECT_STATUSES,
         "filter_status": status,
-    })
+    }))
+
 
 
 # ─── GET /projects/{id} ────────────────────────────────────────────────────────
@@ -121,13 +123,14 @@ async def project_detail(request: Request, proj_id: int):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "project_detail.html", {
+    return templates.TemplateResponse(request, "project_detail.html", tmpl_ctx(request, {
         "request": request,
         "prefix": prefix,
         "project": project,
         "owners": OWNERS,
         "statuses": PROJECT_STATUSES,
-    })
+    }))
+
 
 
 # ─── GET /projects/{id}/edit ──────────────────────────────────────────────────
@@ -146,13 +149,14 @@ async def project_edit_form(request: Request, proj_id: int):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "project_form.html", {
+    return templates.TemplateResponse(request, "project_form.html", tmpl_ctx(request, {
         "request": request,
         "prefix": prefix,
         "project": project,
         "owners": OWNERS,
         "statuses": PROJECT_STATUSES,
-    })
+    }))
+
 
 
 # ─── PUT /projects/{id} ───────────────────────────────────────────────────────

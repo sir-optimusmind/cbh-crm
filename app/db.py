@@ -24,6 +24,7 @@ _MIGRATION_001 = Path(__file__).parent.parent / "migrations" / "001_initial_sche
 _MIGRATION_002 = Path(__file__).parent.parent / "migrations" / "002_stimmung_field.sql"
 _MIGRATION_003 = Path(__file__).parent.parent / "migrations" / "002_sprint2_schema.sql"
 _MIGRATION_004 = Path(__file__).parent.parent / "migrations" / "003_vision_fields.sql"
+_MIGRATION_005 = Path(__file__).parent.parent / "migrations" / "004_user_allowlist.sql"
 
 
 def get_connection() -> sqlite3.Connection:
@@ -184,6 +185,26 @@ def _run_migration_vision(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+
+def _run_migration_user_allowlist(conn: sqlite3.Connection) -> None:
+    """
+    Migration 004: User-Allowlist fuer SSO (Sprint 3 CRM-031/033).
+    Tabelle crm_user mit Roles + Initial-Seed.
+    Idempotent via _migration_004_guard.
+    """
+    guard_exists = _table_exists(conn, "_migration_004_guard")
+    if guard_exists:
+        already = conn.execute(
+            "SELECT 1 FROM _migration_004_guard WHERE applied='004_user_allowlist'"
+        ).fetchone()
+        if already:
+            return
+
+    if _MIGRATION_005.exists():
+        conn.executescript(_MIGRATION_005.read_text(encoding="utf-8"))
+        conn.commit()
+
+
 def init_db() -> None:
     """
     Legt alle Tabellen an falls noch nicht vorhanden.
@@ -200,6 +221,7 @@ def init_db() -> None:
         _run_migration_002(conn)
         _run_migration_sprint2(conn)
         _run_migration_vision(conn)
+        _run_migration_user_allowlist(conn)
     finally:
         conn.close()
 

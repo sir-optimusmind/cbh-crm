@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}CBH MISSION CTRL – CRM{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;900&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -62,6 +62,9 @@
     /* Progress Bar */
     .progress-bar { height: 6px; border-radius: 3px; background: #333; overflow: hidden; }
     .progress-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+    /* User-Avatar */
+    .user-avatar { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #1E1E1E; flex-shrink: 0; }
+    .logout-form { display: inline; }
   </style>
 </head>
 <body>
@@ -70,9 +73,11 @@
   <!-- Header -->
   <header style="background:#1a1a1a; border-bottom:1px solid #333; padding:12px 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:50;">
     <div style="display:flex; align-items:center; gap:12px;">
-      <span style="font-weight:900; font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:#F0F0F0;">CBH</span>
-      <span style="color:#444; font-size:12px;">|</span>
-      <span style="font-weight:900; font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:#FFFB76;">MISSION CTRL</span>
+      <a href="https://hook.srv960331.hstgr.cloud/mission-ctrl/" style="text-decoration:none;">
+        <span style="font-weight:900; font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:#F0F0F0;">CBH</span>
+        <span style="color:#444; font-size:12px; margin:0 6px;">|</span>
+        <span style="font-weight:900; font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:#FFFB76;">MISSION CTRL</span>
+      </a>
       <span style="color:#444; font-size:12px;">|</span>
       <span style="font-weight:600; font-size:13px; letter-spacing:0.08em; text-transform:uppercase; color:#aaa;">CRM</span>
     </div>
@@ -82,6 +87,20 @@
       <a href="{{ prefix }}/personen" style="color:#aaa; text-decoration:none; font-size:13px; font-weight:600;" onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'">Personen</a>
       <a href="{{ prefix }}/unternehmen" style="color:#aaa; text-decoration:none; font-size:13px; font-weight:600;" onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'">Unternehmen</a>
       <a href="{{ prefix }}/projects" style="color:#aaa; text-decoration:none; font-size:13px; font-weight:600;" onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'">Projekte</a>
+      <!-- User-Avatar + Logout -->
+      {% if current_user %}
+      <div style="display:flex; align-items:center; gap:8px; margin-left:8px; border-left:1px solid #333; padding-left:16px;">
+        <span class="user-avatar" style="background:{{ current_user.color }};" title="{{ current_user.email }}">
+          {{ current_user.name[:1].upper() }}
+        </span>
+        <span style="font-size:12px; color:#888;">{{ current_user.name }}</span>
+        <form class="logout-form" action="{{ prefix }}/auth/logout" method="post">
+          <button type="submit" style="background:none; border:none; color:#666; cursor:pointer; font-size:12px; padding:4px 6px; border-radius:4px; font-family:'Barlow',sans-serif;" onmouseover="this.style.color='#FCA5A5'" onmouseout="this.style.color='#666'" title="Abmelden">
+            Logout
+          </button>
+        </form>
+      </div>
+      {% endif %}
     </nav>
   </header>
 

@@ -100,12 +100,13 @@ async def pipeline_kanban(request: Request):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "pipeline.html", {
+    return templates.TemplateResponse(request, "pipeline.html", tmpl_ctx(request, {
         "request": request,
         "prefix": prefix,
         "stages": STAGE_ORDER,
         "stages_data": stages_data,
-    })
+    }))
+
 
 
 # ─── GET /pipeline/stages ──────────────────────────────────────────────────────
@@ -126,8 +127,9 @@ async def pipeline_stages(request: Request):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "pipeline_stages.html", {
+    return templates.TemplateResponse(request, "pipeline_stages.html", tmpl_ctx(request, {
         "request": request,
         "prefix": prefix,
         "stage_defs": stage_defs,
-    })
+    }))
+

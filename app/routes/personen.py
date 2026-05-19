@@ -24,6 +24,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from app.db import get_connection, write_audit_log, now_iso
+from app.template_utils import tmpl_ctx
 
 _EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -136,7 +137,7 @@ def personen_liste(
         conn.close()
 
     personen = [_enrich_person(r) for r in rows]
-    return templates.TemplateResponse(request, "personen_liste.html", {
+    return templates.TemplateResponse(request, "personen_liste.html", tmpl_ctx(request, {
         "prefix": prefix,
         "personen": personen,
         "q": q,
@@ -145,7 +146,8 @@ def personen_liste(
         "stimmungen": STIMMUNGEN,
         "stimmung_filter": stimmung,
         "letzter_kontakt_filter": letzter_kontakt,
-    })
+    }))
+
 
 
 # ─── Anlegen-Form ─────────────────────────────────────────────────────────────
@@ -153,13 +155,14 @@ def personen_liste(
 @router.get("/personen/neu", response_class=HTMLResponse)
 def person_neu_form(request: Request):
     prefix = request.scope.get("root_path", "")
-    return templates.TemplateResponse(request, "person_form.html", {
+    return templates.TemplateResponse(request, "person_form.html", tmpl_ctx(request, {
         "prefix": prefix,
         "person": None,
         "owners": OWNERS,
         "stimmungen": STIMMUNGEN,
         "stimmungen_cbh": STIMMUNGEN_CBH,
-    })
+    }))
+
 
 
 # ─── POST Anlegen ─────────────────────────────────────────────────────────────
@@ -308,7 +311,7 @@ def person_detail(request: Request, person_id: int):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "person_detail.html", {
+    return templates.TemplateResponse(request, "person_detail.html", tmpl_ctx(request, {
         "prefix": prefix,
         "person": person,
         "verknuepfungen": verknuepfungen,
@@ -318,7 +321,8 @@ def person_detail(request: Request, person_id: int):
         "touchpoints": touchpoints,
         "aktive_deals": aktive_deals,
         "aktueller_deal": aktueller_deal,
-    })
+    }))
+
 
 
 # ─── Edit-Form ────────────────────────────────────────────────────────────────
@@ -337,13 +341,14 @@ def person_edit_form(request: Request, person_id: int):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "person_form.html", {
+    return templates.TemplateResponse(request, "person_form.html", tmpl_ctx(request, {
         "prefix": prefix,
         "person": person,
         "owners": OWNERS,
         "stimmungen": STIMMUNGEN,
         "stimmungen_cbh": STIMMUNGEN_CBH,
-    })
+    }))
+
 
 
 # ─── PUT Full Replacement ─────────────────────────────────────────────────────

@@ -22,6 +22,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.db import get_connection, write_audit_log, now_iso
+from app.template_utils import tmpl_ctx
 
 router = APIRouter()
 
@@ -159,7 +160,7 @@ async def deals_liste(
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "deals_liste.html", {
+    return templates.TemplateResponse(request, "deals_liste.html", tmpl_ctx(request, {
         "request": request,
         "prefix": prefix,
         "deals": deals,
@@ -169,7 +170,8 @@ async def deals_liste(
         "filter_stage": stage,
         "filter_owner": owner,
         "filter_product": product,
-    })
+    }))
+
 
 
 # ─── CRM-010: Deal anlegen (Formular) ────────────────────────────────────────
@@ -188,7 +190,7 @@ async def deal_new_form(request: Request):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "deal_form.html", {
+    return templates.TemplateResponse(request, "deal_form.html", tmpl_ctx(request, {
         "request": request,
         "prefix": prefix,
         "deal": None,
@@ -201,7 +203,8 @@ async def deal_new_form(request: Request):
         "lead_types": LEAD_TYPES,
         "icp_personas": ICP_PERSONAS,
         "selected_products": [],
-    })
+    }))
+
 
 
 # ─── CRM-010: Deal anlegen (POST) ─────────────────────────────────────────────
@@ -258,14 +261,14 @@ async def deal_create(
             unternehmen_list = conn.execute("SELECT id, name FROM unternehmen WHERE deleted_at IS NULL ORDER BY name").fetchall()
         finally:
             conn.close()
-        return templates.TemplateResponse(request, "deal_form.html", {
+        return templates.TemplateResponse(request, "deal_form.html", tmpl_ctx(request, {
             "request": request, "prefix": prefix, "deal": None,
             "personen": personen, "unternehmen": unternehmen_list,
             "stages": STAGES, "owners": OWNERS, "products": PRODUCTS,
             "lead_sources": LEAD_SOURCES, "lead_types": LEAD_TYPES,
             "icp_personas": ICP_PERSONAS, "selected_products": products,
             "flash_error": err,
-        }, status_code=422)
+        }), status_code=422)
 
     conn = get_connection()
     try:
@@ -336,14 +339,15 @@ async def deal_detail(request: Request, deal_id: int):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "deal_detail.html", {
+    return templates.TemplateResponse(request, "deal_detail.html", tmpl_ctx(request, {
         "request": request,
         "prefix": prefix,
         "deal": deal,
         "touchpoints": touchpoints,
         "personen": personen,
         "stages": STAGES,
-    })
+    }))
+
 
 
 # ─── CRM-010: Deal bearbeiten (Formular) ──────────────────────────────────────
@@ -369,7 +373,7 @@ async def deal_edit_form(request: Request, deal_id: int):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "deal_form.html", {
+    return templates.TemplateResponse(request, "deal_form.html", tmpl_ctx(request, {
         "request": request,
         "prefix": prefix,
         "deal": deal,
@@ -382,7 +386,8 @@ async def deal_edit_form(request: Request, deal_id: int):
         "lead_types": LEAD_TYPES,
         "icp_personas": ICP_PERSONAS,
         "selected_products": deal["products"],
-    })
+    }))
+
 
 
 # ─── CRM-010: Deal bearbeiten (PUT) ───────────────────────────────────────────
@@ -440,14 +445,14 @@ async def deal_update(
             unternehmen_list = conn.execute("SELECT id, name FROM unternehmen WHERE deleted_at IS NULL ORDER BY name").fetchall()
         finally:
             conn.close()
-        return templates.TemplateResponse(request, "deal_form.html", {
+        return templates.TemplateResponse(request, "deal_form.html", tmpl_ctx(request, {
             "request": request, "prefix": prefix, "deal": deal,
             "personen": personen, "unternehmen": unternehmen_list,
             "stages": STAGES, "owners": OWNERS, "products": PRODUCTS,
             "lead_sources": LEAD_SOURCES, "lead_types": LEAD_TYPES,
             "icp_personas": ICP_PERSONAS, "selected_products": products,
             "flash_error": err,
-        }, status_code=422)
+        }), status_code=422)
 
     conn = get_connection()
     try:
@@ -649,12 +654,13 @@ async def deal_create_project_form(request: Request, deal_id: int):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "project_create.html", {
+    return templates.TemplateResponse(request, "project_create.html", tmpl_ctx(request, {
         "request": request,
         "prefix": prefix,
         "deal": deal,
         "owners": OWNERS,
-    })
+    }))
+
 
 
 @router.post("/deals/{deal_id}/create-project")

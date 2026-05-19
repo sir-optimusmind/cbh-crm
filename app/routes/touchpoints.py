@@ -16,6 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from app.db import get_connection, write_audit_log, now_iso
+from app.template_utils import tmpl_ctx
 
 router = APIRouter()
 _TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
@@ -165,7 +166,7 @@ async def person_touchpoints_fragment(request: Request, person_id: int):
     finally:
         conn.close()
 
-    return templates.TemplateResponse(request, "touchpoint_timeline_fragment.html", {
+    return templates.TemplateResponse(request, "touchpoint_timeline_fragment.html", tmpl_ctx(request, {
         "request": request,
         "prefix": prefix,
         "touchpoints": touchpoints,
@@ -173,4 +174,5 @@ async def person_touchpoints_fragment(request: Request, person_id: int):
         "active_deals": active_deals,
         "arten": TOUCHPOINT_ARTEN,
         "owners": OWNERS,
-    })
+    }))
+
