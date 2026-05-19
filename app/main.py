@@ -1,9 +1,10 @@
 """
 main.py – CBH MISSION CTRL CRM Module
-FastAPI App – Sprint 1 + Sprint 2 + Sprint 3 (SSO)
+FastAPI App – Sprint 1 + Sprint 2 + Sprint 3 (SSO + Modul-Trennung)
 
 APP_PREFIX kommt aus .env (PFLICHT, nie hardcoden).
 SSO via Google OAuth (CRM-031/032/033/034).
+Modul-Trennung: CRM / Pipeline / Projects (CRM-035/036).
 """
 
 import os
@@ -15,13 +16,15 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.db import init_db
-from app.auth import router as auth_router, SECRET_KEY, SESSION_MAX_AGE, APP_PREFIX as AUTH_APP_PREFIX
-from app.routes.personen import router as personen_router
-from app.routes.unternehmen import router as unternehmen_router
-from app.routes.deals import router as deals_router
-from app.routes.touchpoints import router as touchpoints_router
-from app.routes.projects import router as projects_router
-from app.routes.pipeline import router as pipeline_router
+from app.auth import router as auth_router, SECRET_KEY, SESSION_MAX_AGE
+
+# ─── Modul-Router ─────────────────────────────────────────────────────────────
+# CRM-Modul: Personen + Unternehmen + Touchpoints
+from app.modules.crm.routes import router as crm_router
+# Pipeline-Modul: Deals + Pipeline-Kanban
+from app.modules.pipeline.routes import router as pipeline_router
+# Projects-Modul
+from app.modules.projects.routes import router as projects_router
 
 # ─── Konfiguration aus .env ───────────────────────────────────────────────────
 APP_PREFIX = os.getenv("APP_PREFIX", "/mission-ctrl/crm-staging").rstrip("/")
@@ -49,8 +52,12 @@ class AuthGuardMiddleware(BaseHTTPMiddleware):
     """
     Prueft Session bei jedem Request.
     Oeffentliche Pfade: /health, /auth/*
-    Alle anderen: require_login, sonst Redirect zu /auth/login.
-    Middleware-Reihenfolge: SessionMiddleware laeuft VOR diesem Guard.
+    Alle anderen: Session-Check, sonst Redirect zu /auth/login.
+
+    Middleware-Reihenfolge (LIFO):
+    SessionMiddleware wird NACH AuthGuardMiddleware registriert →
+    SessionMiddleware laeuft ZUERST (verarbeitet Cookie) →
+    AuthGuardMiddleware hat request.session verfuegbar.
     """
 
     PUBLIC_PATHS = ("/health", "/auth/login", "/auth/callback", "/auth/logout")
@@ -58,29 +65,25 @@ class AuthGuardMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
         root = APP_PREFIX
-        # Pfad relativ zum root_path
         relative = path[len(root):] if path.startswith(root) else path
         if not relative:
             relative = "/"
 
-        # Oeffentliche Pfade durchlassen
+        # Oeffentliche Pfade
         if any(relative == p or relative.startswith(p) for p in self.PUBLIC_PATHS):
             return await call_next(request)
 
         # Session pruefen
         user = request.session.get("user")
         if not user:
-            # next-URL fuer Post-Login-Redirect merken
             request.session["next"] = path
             return RedirectResponse(url=f"{root}/auth/login", status_code=302)
 
-        # User in request.state ablegen (Backward-Kompatibilitaet)
         request.state.crm_user = user
         return await call_next(request)
 
 
-# ─── Middleware registrieren (Reihenfolge: LIFO – letztes add_middleware laeuft zuerst) ──
-# SessionMiddleware ZULETZT hinzufuegen → laeuft ZUERST (verarbeitet Cookie vor AuthGuard)
+# ─── Middleware registrieren (LIFO) ───────────────────────────────────────────
 app.add_middleware(AuthGuardMiddleware)
 app.add_middleware(
     SessionMiddleware,
@@ -93,19 +96,26 @@ app.add_middleware(
 )
 
 # ─── Router einbinden ─────────────────────────────────────────────────────────
+# Auth-Router (Login/Callback/Logout)
 app.include_router(auth_router)
-app.include_router(personen_router)
-app.include_router(unternehmen_router)
-app.include_router(deals_router)
-app.include_router(touchpoints_router)
-app.include_router(projects_router)
+# CRM-Modul: Personen + Unternehmen + Touchpoints (keine eigene URL-Prefix-Ebene,
+# da die Routen ihre Pfade direkt definieren: /personen, /unternehmen, /touchpoints)
+app.include_router(crm_router)
+# Pipeline-Modul: Deals + Pipeline-Kanban (/deals, /pipeline)
 app.include_router(pipeline_router)
+# Projects-Modul: (/projects)
+app.include_router(projects_router)
 
 
 # ─── Health-Check (oeffentlich) ───────────────────────────────────────────────
 @app.get("/health")
 async def health():
-    return JSONResponse({"status": "ok", "env": CRM_ENV, "auth": "sso"})
+    return JSONResponse({
+        "status": "ok",
+        "env": CRM_ENV,
+        "auth": "sso",
+        "modules": ["crm", "pipeline", "projects"]
+    })
 
 
 # ─── Root Redirect → /personen ────────────────────────────────────────────────
