@@ -45,6 +45,7 @@ async def touchpoint_create(
     erstellt_von: str = Form(...),
     inhalt: str = Form(...),
     naechster_schritt: Optional[str] = Form(None),
+    details: Optional[str] = Form(None),
 ):
     prefix = request.scope.get("root_path", "")
     user = get_user(request)
@@ -53,6 +54,7 @@ async def touchpoint_create(
     person_id = person_id or None
     deal_id = deal_id or None
     naechster_schritt = naechster_schritt.strip() if naechster_schritt else None
+    details = details.strip() if details else None
     inhalt = inhalt.strip()
 
     if not person_id and not deal_id:
@@ -65,9 +67,9 @@ async def touchpoint_create(
         ts = now_iso()
         cur = conn.execute(
             """INSERT INTO touchpoint (deal_id, person_id, art, datum, erstellt_von, inhalt,
-               naechster_schritt, created_at, created_by)
-               VALUES (?,?,?,?,?,?,?,?,?)""",
-            (deal_id, person_id, art, datum, erstellt_von, inhalt, naechster_schritt, ts, user)
+               naechster_schritt, details, created_at, created_by)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (deal_id, person_id, art, datum, erstellt_von, inhalt, naechster_schritt, details, ts, user)
         )
         tp_id = cur.lastrowid
 

@@ -1,9 +1,12 @@
 """
-routes/unternehmen.py – CRM-005 (Unternehmen CRUD) + CRM-006 (Detail) + CRM-007 (n:m)
+routes/unternehmen.py – CRM-005/006/007 + CRM-022 (Vision-Felder)
 
 Regeln: analog zu personen.py
+CRM-022: sense_of_urgency, sense_of_opportunity, financials, news_json,
+         produkt_empfehlung, cbh_umsatz_gesamt (aggregiert oder manuell)
 """
 
+import json
 import os
 from typing import Optional
 
@@ -19,6 +22,7 @@ _TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
 templates = Jinja2Templates(directory=_TEMPLATE_DIR)
 
 BRANCHEN = ["Automotive", "Maschinenbau", "Fertigende-Industrie", "IT-Digital", "Energiewirtschaft", "Other"]
+PRODUKTE = ["race", "blindspot", "okr_training", "pm_training", "innovation_cell", "visionsworkshop", "empower_os", "tm", "other"]
 
 
 def get_user(request: Request) -> str:
@@ -29,7 +33,25 @@ def get_client_ip(request: Request) -> Optional[str]:
     return request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
 
 
-# ─── CRM-005: Listen-View ────────────────────────────────────────────────────
+def _parse_groesse(groesse_ma: Optional[str]) -> Optional[int]:
+    if groesse_ma and groesse_ma.strip():
+        try:
+            return int(groesse_ma.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _parse_float(val: Optional[str]) -> Optional[float]:
+    if val and str(val).strip():
+        try:
+            return float(str(val).strip())
+        except ValueError:
+            return None
+    return None
+
+
+# ─── Listen-View ─────────────────────────────────────────────────────────────
 
 @router.get("/unternehmen", response_class=HTMLResponse)
 def unternehmen_liste(request: Request, q: str = "", branche: str = ""):
@@ -58,7 +80,7 @@ def unternehmen_liste(request: Request, q: str = "", branche: str = ""):
     })
 
 
-# ─── CRM-005: Anlegen-Form ───────────────────────────────────────────────────
+# ─── Anlegen-Form ─────────────────────────────────────────────────────────────
 
 @router.get("/unternehmen/neu", response_class=HTMLResponse)
 def unternehmen_neu_form(request: Request):
@@ -66,10 +88,12 @@ def unternehmen_neu_form(request: Request):
     return templates.TemplateResponse(request, "unternehmen_form.html", {
         "prefix": prefix,
         "unternehmen": None,
+        "branchen": BRANCHEN,
+        "produkte": PRODUKTE,
     })
 
 
-# ─── CRM-005: POST Anlegen ───────────────────────────────────────────────────
+# ─── POST Anlegen ─────────────────────────────────────────────────────────────
 
 @router.post("/unternehmen")
 async def unternehmen_erstellen(
@@ -79,6 +103,18 @@ async def unternehmen_erstellen(
     groesse_ma: Optional[str] = Form(None),
     website: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
+    hauptsitz: Optional[str] = Form(None),
+    muttergesellschaft: Optional[str] = Form(None),
+    sense_of_urgency: Optional[str] = Form(None),
+    sense_of_opportunity: Optional[str] = Form(None),
+    umsatz_mio: Optional[str] = Form(None),
+    rentabilitaet_notiz: Optional[str] = Form(None),
+    wachstum_notiz: Optional[str] = Form(None),
+    news_json: Optional[str] = Form(None),
+    produkt_empfehlung: Optional[str] = Form(None),
+    produkt_empfehlung_sekundaer: Optional[str] = Form(None),
+    eigentuemerstruktur: Optional[str] = Form(None),
+    cbh_umsatz_gesamt: Optional[str] = Form(None),
 ):
     prefix = request.scope.get("root_path", "")
     user = get_user(request)
@@ -87,11 +123,22 @@ async def unternehmen_erstellen(
     branche = branche or None
     website = website.strip() or None if website else None
     notes = notes.strip() or None if notes else None
-    groesse_int = int(groesse_ma) if groesse_ma and groesse_ma.strip() else None
+    groesse_int = _parse_groesse(groesse_ma)
+    umsatz_mio_f = _parse_float(umsatz_mio)
+    cbh_umsatz_f = _parse_float(cbh_umsatz_gesamt)
+    hauptsitz = hauptsitz.strip() or None if hauptsitz else None
+    muttergesellschaft = muttergesellschaft.strip() or None if muttergesellschaft else None
+    sense_of_urgency = sense_of_urgency.strip() or None if sense_of_urgency else None
+    sense_of_opportunity = sense_of_opportunity.strip() or None if sense_of_opportunity else None
+    rentabilitaet_notiz = rentabilitaet_notiz.strip() or None if rentabilitaet_notiz else None
+    wachstum_notiz = wachstum_notiz.strip() or None if wachstum_notiz else None
+    news_json = news_json.strip() or None if news_json else None
+    produkt_empfehlung = produkt_empfehlung if produkt_empfehlung in PRODUKTE else None
+    produkt_empfehlung_sekundaer = produkt_empfehlung_sekundaer if produkt_empfehlung_sekundaer in PRODUKTE else None
+    eigentuemerstruktur = eigentuemerstruktur.strip() or None if eigentuemerstruktur else None
 
     conn = get_connection()
     try:
-        # BUG-06: Duplikat-Prüfung vor INSERT → 422 statt 400 (Konsistenz mit Person-Validierung)
         existing = conn.execute(
             "SELECT id FROM unternehmen WHERE name=? AND deleted_at IS NULL", (name,)
         ).fetchone()
@@ -103,14 +150,22 @@ async def unternehmen_erstellen(
 
         ts = now_iso()
         cur = conn.execute(
-            """INSERT INTO unternehmen (name, branche, groesse_ma, website, notes, created_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (name, branche, groesse_int, website, notes, user, ts, ts)
+            """INSERT INTO unternehmen (name, branche, groesse_ma, website, notes,
+               hauptsitz, muttergesellschaft, sense_of_urgency, sense_of_opportunity,
+               umsatz_mio, rentabilitaet_notiz, wachstum_notiz, news_json,
+               produkt_empfehlung, produkt_empfehlung_sekundaer, eigentuemerstruktur,
+               cbh_umsatz_gesamt, created_by, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (name, branche, groesse_int, website, notes,
+             hauptsitz, muttergesellschaft, sense_of_urgency, sense_of_opportunity,
+             umsatz_mio_f, rentabilitaet_notiz, wachstum_notiz, news_json,
+             produkt_empfehlung, produkt_empfehlung_sekundaer, eigentuemerstruktur,
+             cbh_umsatz_f, user, ts, ts)
         )
         new_id = cur.lastrowid
         write_audit_log(conn,
             user=user, entity_type="unternehmen", entity_id=new_id, action="CREATE",
-            changed_fields={"name": name, "branche": branche, "groesse_ma": groesse_int, "website": website, "notes": notes},
+            changed_fields={"name": name, "branche": branche},
             ip_address=ip
         )
         conn.commit()
@@ -123,7 +178,7 @@ async def unternehmen_erstellen(
     return JSONResponse({"redirect": f"{prefix}/unternehmen/{new_id}"})
 
 
-# ─── CRM-006: Detail-View ────────────────────────────────────────────────────
+# ─── Detail-View (CRM-022) ───────────────────────────────────────────────────
 
 @router.get("/unternehmen/{unternehmen_id}", response_class=HTMLResponse)
 def unternehmen_detail(request: Request, unternehmen_id: int):
@@ -137,28 +192,60 @@ def unternehmen_detail(request: Request, unternehmen_id: int):
             raise HTTPException(status_code=404, detail="Unternehmen nicht gefunden")
         unternehmen = dict(row)
 
-        # Verknüpfte Personen
-        verknuepfungen = conn.execute(
-            """SELECT pu.person_id, pu.rolle, pu.primary_company, p.vorname, p.nachname
+        # Verknüpfte Personen mit aktueller Stage (CRM-022 "Bekannte Personen")
+        verknuepfungen_raw = conn.execute(
+            """SELECT pu.person_id, pu.rolle, pu.primary_company, p.vorname, p.nachname,
+                      p.stimmung
                FROM person_unternehmen pu
                JOIN person p ON p.id = pu.person_id
                WHERE pu.unternehmen_id = ? AND p.deleted_at IS NULL
                ORDER BY pu.primary_company DESC, p.nachname""",
             (unternehmen_id,)
         ).fetchall()
-        verknuepfungen = [dict(v) for v in verknuepfungen]
+        verknuepfungen = [dict(v) for v in verknuepfungen_raw]
 
-        # Alle aktiven Personen für Dropdown
+        # Aktuellen Deal-Stage pro Person nachladen
+        for v in verknuepfungen:
+            deal_row = conn.execute(
+                """SELECT stage FROM deal WHERE person_id=? AND deleted_at IS NULL
+                   ORDER BY created_at DESC LIMIT 1""",
+                (v["person_id"],)
+            ).fetchone()
+            v["aktueller_stage"] = deal_row["stage"] if deal_row else None
+
+        # Alle Personen für Dropdown
         alle_p = conn.execute(
             "SELECT id, vorname, nachname FROM person WHERE deleted_at IS NULL ORDER BY nachname, vorname"
         ).fetchall()
         alle_personen = [dict(p) for p in alle_p]
 
-        # BUG-01 (P0): person_count für Delete-Button-State im Template
         person_count = conn.execute(
             "SELECT COUNT(*) FROM person_unternehmen WHERE unternehmen_id=?",
             (unternehmen_id,)
         ).fetchone()[0]
+
+        # CBH-Umsatz: entweder manuell aus cbh_umsatz_gesamt oder aggregiert aus won-Deals
+        cbh_umsatz = unternehmen.get("cbh_umsatz_gesamt")
+        cbh_umsatz_source = "manuell"
+        if cbh_umsatz is None:
+            agg = conn.execute(
+                """SELECT SUM(acv) FROM deal
+                   WHERE unternehmen_id=? AND stage='won' AND deleted_at IS NULL AND acv IS NOT NULL""",
+                (unternehmen_id,)
+            ).fetchone()[0]
+            if agg:
+                cbh_umsatz = agg
+                cbh_umsatz_source = "aggregiert"
+
+        # News JSON parsen
+        news_list = []
+        if unternehmen.get("news_json"):
+            try:
+                news_list = json.loads(unternehmen["news_json"])
+                if not isinstance(news_list, list):
+                    news_list = []
+            except (json.JSONDecodeError, TypeError):
+                news_list = []
 
     finally:
         conn.close()
@@ -169,10 +256,15 @@ def unternehmen_detail(request: Request, unternehmen_id: int):
         "verknuepfungen": verknuepfungen,
         "alle_personen": alle_personen,
         "person_count": person_count,
+        "cbh_umsatz": cbh_umsatz,
+        "cbh_umsatz_source": cbh_umsatz_source,
+        "news_list": news_list,
+        "branchen": BRANCHEN,
+        "produkte": PRODUKTE,
     })
 
 
-# ─── CRM-005: Edit-Form ──────────────────────────────────────────────────────
+# ─── Edit-Form ────────────────────────────────────────────────────────────────
 
 @router.get("/unternehmen/{unternehmen_id}/edit", response_class=HTMLResponse)
 def unternehmen_edit_form(request: Request, unternehmen_id: int):
@@ -191,10 +283,12 @@ def unternehmen_edit_form(request: Request, unternehmen_id: int):
     return templates.TemplateResponse(request, "unternehmen_form.html", {
         "prefix": prefix,
         "unternehmen": unternehmen,
+        "branchen": BRANCHEN,
+        "produkte": PRODUKTE,
     })
 
 
-# ─── CRM-005: PUT Full Replacement ───────────────────────────────────────────
+# ─── PUT Full Replacement (CRM-022) ──────────────────────────────────────────
 
 @router.put("/unternehmen/{unternehmen_id}")
 async def unternehmen_aktualisieren(
@@ -205,6 +299,18 @@ async def unternehmen_aktualisieren(
     groesse_ma: Optional[str] = Form(None),
     website: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
+    hauptsitz: Optional[str] = Form(None),
+    muttergesellschaft: Optional[str] = Form(None),
+    sense_of_urgency: Optional[str] = Form(None),
+    sense_of_opportunity: Optional[str] = Form(None),
+    umsatz_mio: Optional[str] = Form(None),
+    rentabilitaet_notiz: Optional[str] = Form(None),
+    wachstum_notiz: Optional[str] = Form(None),
+    news_json: Optional[str] = Form(None),
+    produkt_empfehlung: Optional[str] = Form(None),
+    produkt_empfehlung_sekundaer: Optional[str] = Form(None),
+    eigentuemerstruktur: Optional[str] = Form(None),
+    cbh_umsatz_gesamt: Optional[str] = Form(None),
 ):
     prefix = request.scope.get("root_path", "")
     user = get_user(request)
@@ -213,7 +319,19 @@ async def unternehmen_aktualisieren(
     branche = branche or None
     website = website.strip() or None if website else None
     notes = notes.strip() or None if notes else None
-    groesse_int = int(groesse_ma) if groesse_ma and groesse_ma.strip() else None
+    groesse_int = _parse_groesse(groesse_ma)
+    umsatz_mio_f = _parse_float(umsatz_mio)
+    cbh_umsatz_f = _parse_float(cbh_umsatz_gesamt)
+    hauptsitz = hauptsitz.strip() or None if hauptsitz else None
+    muttergesellschaft = muttergesellschaft.strip() or None if muttergesellschaft else None
+    sense_of_urgency = sense_of_urgency.strip() or None if sense_of_urgency else None
+    sense_of_opportunity = sense_of_opportunity.strip() or None if sense_of_opportunity else None
+    rentabilitaet_notiz = rentabilitaet_notiz.strip() or None if rentabilitaet_notiz else None
+    wachstum_notiz = wachstum_notiz.strip() or None if wachstum_notiz else None
+    news_json = news_json.strip() or None if news_json else None
+    produkt_empfehlung = produkt_empfehlung if produkt_empfehlung in PRODUKTE else None
+    produkt_empfehlung_sekundaer = produkt_empfehlung_sekundaer if produkt_empfehlung_sekundaer in PRODUKTE else None
+    eigentuemerstruktur = eigentuemerstruktur.strip() or None if eigentuemerstruktur else None
 
     conn = get_connection()
     try:
@@ -226,12 +344,25 @@ async def unternehmen_aktualisieren(
 
         ts = now_iso()
         conn.execute(
-            """UPDATE unternehmen SET name=?, branche=?, groesse_ma=?, website=?, notes=?, updated_at=?
+            """UPDATE unternehmen SET name=?, branche=?, groesse_ma=?, website=?, notes=?,
+               hauptsitz=?, muttergesellschaft=?, sense_of_urgency=?, sense_of_opportunity=?,
+               umsatz_mio=?, rentabilitaet_notiz=?, wachstum_notiz=?, news_json=?,
+               produkt_empfehlung=?, produkt_empfehlung_sekundaer=?, eigentuemerstruktur=?,
+               cbh_umsatz_gesamt=?, updated_at=?
                WHERE id=?""",
-            (name, branche, groesse_int, website, notes, ts, unternehmen_id)
+            (name, branche, groesse_int, website, notes,
+             hauptsitz, muttergesellschaft, sense_of_urgency, sense_of_opportunity,
+             umsatz_mio_f, rentabilitaet_notiz, wachstum_notiz, news_json,
+             produkt_empfehlung, produkt_empfehlung_sekundaer, eigentuemerstruktur,
+             cbh_umsatz_f, ts, unternehmen_id)
         )
 
-        new_vals = {"name": name, "branche": branche, "groesse_ma": groesse_int, "website": website, "notes": notes}
+        new_vals = {
+            "name": name, "branche": branche, "groesse_ma": groesse_int, "website": website,
+            "notes": notes, "sense_of_urgency": sense_of_urgency,
+            "sense_of_opportunity": sense_of_opportunity, "umsatz_mio": umsatz_mio_f,
+            "produkt_empfehlung": produkt_empfehlung,
+        }
         diff = {k: {"old": old.get(k), "new": v} for k, v in new_vals.items() if old.get(k) != v}
 
         write_audit_log(conn,
@@ -251,7 +382,7 @@ async def unternehmen_aktualisieren(
     return JSONResponse({"redirect": f"{prefix}/unternehmen/{unternehmen_id}"})
 
 
-# ─── CRM-005: DELETE (Soft-Delete) ───────────────────────────────────────────
+# ─── DELETE (Soft-Delete) ─────────────────────────────────────────────────────
 
 @router.delete("/unternehmen/{unternehmen_id}")
 async def unternehmen_loeschen(request: Request, unternehmen_id: int):
@@ -267,16 +398,12 @@ async def unternehmen_loeschen(request: Request, unternehmen_id: int):
         if not row:
             raise HTTPException(status_code=404, detail="Unternehmen nicht gefunden")
 
-        # BUG-01 (P0): Delete-Guard – Verknüpfte Personen prüfen vor Soft-Delete
         linked_count = conn.execute(
             "SELECT COUNT(*) FROM person_unternehmen WHERE unternehmen_id=?",
             (unternehmen_id,)
         ).fetchone()[0]
         if linked_count > 0:
-            return JSONResponse(
-                {"error": "Erst Personen-Verknüpfungen lösen"},
-                status_code=422
-            )
+            return JSONResponse({"error": "Erst Personen-Verknüpfungen lösen"}, status_code=422)
 
         ts = now_iso()
         conn.execute(
@@ -342,7 +469,7 @@ async def unternehmen_person_verknuepfen(
     return RedirectResponse(url=f"{prefix}/unternehmen/{unternehmen_id}", status_code=303)
 
 
-# ─── CRM-007: Verknüpfung lösen (von Unternehmen-Seite) ──────────────────────
+# ─── CRM-007: Verknüpfung lösen ──────────────────────────────────────────────
 
 @router.delete("/unternehmen/{unternehmen_id}/personen/{person_id}")
 async def unternehmen_person_loesen(request: Request, unternehmen_id: int, person_id: int):

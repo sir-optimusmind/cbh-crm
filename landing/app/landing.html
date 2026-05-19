@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CBH MISSION CTRL · Tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --black:        #111111;
+  --surface:      #181818;
+  --surface2:     #222222;
+  --border:       #2a2a2a;
+  --border-light: #383838;
+  --yellow:       #FFFB76;
+  --yellow-dim:   rgba(255,251,118,0.10);
+  --blue:         #5870E2;
+  --white:        #FFFFFF;
+  --text:         #E8E8E8;
+  --text-dim:     #999999;
+  --muted:        #555555;
+  --green:        #34d17a;
+  --green-dim:    rgba(52,209,122,0.12);
+  --orange:       #ffaa33;
+  --orange-dim:   rgba(255,170,51,0.12);
+  --teal:         #2fcfca;
+  --teal-dim:     rgba(47,207,202,0.12);
+}
+
+html { font-size: 16px; }
+body {
+  font-family: 'Barlow', sans-serif;
+  color: var(--text);
+  background: var(--black);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== TOPBAR ===== */
+.topbar {
+  background: var(--black);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.topbar-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 32px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.topbar-brand .rockfist {
+  height: 20px;
+  width: auto;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+.topbar-brand .sep {
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  margin: 0 4px;
+}
+.topbar-brand .brand-text {
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--yellow);
+  white-space: nowrap;
+}
+.topbar-spacer { flex: 1; }
+.topbar-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ===== HERO ===== */
+.hero {
+  background: var(--black);
+  border-bottom: 1px solid var(--border);
+  padding: 56px 32px 48px;
+}
+.hero-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.hero-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hero-eyebrow::before {
+  content: '';
+  display: inline-block;
+  width: 24px;
+  height: 2px;
+  background: var(--yellow);
+}
+.hero-title {
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1.0;
+  letter-spacing: -0.01em;
+  color: var(--white);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+.hero-title .accent { color: var(--yellow); }
+.hero-sub {
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  max-width: 540px;
+  line-height: 1.55;
+}
+
+/* ===== MAIN ===== */
+main {
+  flex: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 52px 32px 80px;
+  width: 100%;
+}
+
+/* ===== KACHEL-GRID ===== */
+.tools-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 24px;
+}
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+}
+
+/* ===== KACHEL ===== */
+.tool-card {
+  background: var(--surface);
+  padding: 32px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+  transition: background 0.15s;
+}
+.tool-card:hover {
+  background: var(--surface2);
+}
+.tool-card.coming-soon {
+  opacity: 0.6;
+}
+.tool-card.coming-soon:hover {
+  background: var(--surface);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.card-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+
+.card-name {
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--white);
+  margin-bottom: 10px;
+}
+
+.card-desc {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+  flex: 1;
+  margin-bottom: 24px;
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Status-Badge */
+.status-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border: 1px solid;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-badge::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.status-badge.live {
+  color: var(--green);
+  border-color: var(--green);
+  background: var(--green-dim);
+}
+.status-badge.live::before { background: var(--green); }
+
+.status-badge.staging {
+  color: var(--teal);
+  border-color: var(--teal);
+  background: var(--teal-dim);
+}
+.status-badge.staging::before { background: var(--teal); }
+
+.status-badge.coming-soon {
+  color: var(--orange);
+  border-color: var(--orange);
+  background: var(--orange-dim);
+}
+.status-badge.coming-soon::before { background: var(--orange); opacity: 0.5; }
+
+/* CTA-Button */
+.card-cta {
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--black);
+  background: var(--yellow);
+  padding: 8px 18px;
+  display: inline-block;
+  transition: opacity 0.12s;
+  white-space: nowrap;
+}
+.card-cta:hover { opacity: 0.88; }
+.card-cta.disabled {
+  background: var(--surface2);
+  color: var(--muted);
+  border: 1px solid var(--border-light);
+  cursor: default;
+}
+.card-cta.disabled:hover { opacity: 1; }
+
+/* Divider-Linie oben an der Kachel */
+.tool-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+.tool-card:not(.coming-soon):hover::before {
+  background: var(--yellow);
+}
+
+/* ===== FOOTER ===== */
+footer {
+  background: var(--black);
+  border-top: 1px solid var(--border);
+  padding: 18px 32px;
+}
+footer .footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+footer .footer-brand {
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+footer .footer-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--muted);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 900px) {
+  .tools-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .topbar-inner { padding: 0 20px; }
+  .hero { padding: 40px 20px 36px; }
+  .hero-title { font-size: 2.2rem; }
+  main { padding: 36px 20px 60px; }
+  .tools-grid {
+    grid-template-columns: 1fr;
+    gap: 1px;
+  }
+  .tool-card { padding: 28px 20px 24px; }
+  footer { padding: 16px 20px; }
+  .topbar-meta { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-brand">
+      <!-- Rockfist Signet: inline SVG, white, transparent bg, 20px Höhe -->
+      <svg class="rockfist" viewBox="0 0 1000 1001" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M454.284 351.833C489.982 344.582 519.572 354.072 545.148 379.136C570.407 354.68 599.997 344.046 636.279 352.15C636.279 329.738 635.574 308.713 636.45 287.761C637.886 253.328 654.871 228.215 686.505 215.051C718.14 201.886 747.949 207.629 773.525 230.6C790.631 245.955 799.441 265.909 799.489 288.881C799.708 408.094 800.462 527.331 799.392 646.545C798.272 772.718 692.662 878.985 566.513 881.297C523.32 882.1 479.762 885.702 437.006 874.459C394.884 863.387 358.042 843.141 327.089 812.553C292.777 778.631 258.661 744.514 224.69 710.252C191.669 676.963 191.815 625.715 224.861 592.255C243.671 573.201 262.457 554.172 281.73 535.605C288.324 529.254 291.171 522.757 291.147 513.388C290.806 409.165 290.855 304.965 291.001 200.742C291.05 165.579 311.977 135.964 344.415 123.992C376.171 112.263 411.309 121.242 434.086 147.085C447.811 162.659 454.235 181.08 454.284 201.715C454.357 247.123 454.308 292.555 454.308 337.963C454.284 342.343 454.284 346.699 454.284 351.833ZM545.026 604.69C527.505 620.507 507.235 628.148 483.898 628.173C480.565 628.173 476.72 631.409 474.019 634.061C456.936 650.803 440.121 667.813 423.209 684.75C410.02 697.963 395.663 699.35 384.761 688.448C374.881 678.593 376.39 663.141 388.581 650.852C406.297 633.015 424.28 615.421 441.825 597.438C458.688 580.161 462.509 555.121 451.948 534.559C434.622 500.88 392.742 493.823 364.661 520.956C329.96 554.489 296.136 588.921 262.116 623.135C243.33 642.043 243.306 660.245 262.141 679.226C295.26 712.637 328.281 746.145 362.008 778.923C398.145 814.062 441.873 832.166 492.391 833.14C513.465 833.553 534.562 833.334 555.66 833.188C667.671 832.483 751.137 748.335 751.186 636.008C751.234 524.484 751.21 412.936 751.186 301.413C751.186 296.959 751.332 292.482 751.015 288.029C749.774 271.19 737.364 258.682 720.549 257.076C704.172 255.494 689.425 266.055 685.581 282.675C684.413 287.737 684.291 293.115 684.291 298.347C684.218 380.28 684.34 462.189 684.194 544.122C684.121 586.975 656.501 619.899 614.938 626.785C588.268 631.19 565.54 621.992 545.026 604.69ZM405.81 454.329C405.81 432.769 405.81 410.576 405.81 388.383C405.786 326.404 405.907 264.449 405.688 202.47C405.615 180.034 389.555 165.579 368.238 167.866C350.742 169.74 339.426 183.367 339.378 203.735C339.232 291.63 339.304 379.525 339.329 467.396C339.329 470.097 339.815 472.774 340.108 475.719C350.888 470.754 360.719 465.133 371.255 461.678C381.938 458.222 393.326 456.884 405.81 454.329ZM636.206 483.7C636.206 463.454 636.425 443.208 636.133 422.986C635.866 403.3 622.652 393.737 603.574 398.993C582.647 404.76 569.409 421.575 569.263 443.476C569.044 476.254 569.141 509.056 569.239 541.835C569.287 564.368 583.158 579.577 603.234 579.382C622.555 579.188 635.963 564.125 636.182 542.005C636.352 522.562 636.206 503.119 636.206 483.7ZM505.605 571.498C507.284 572.009 508.963 572.545 510.642 573.056C513.976 564.539 519.937 556.095 520.205 547.48C521.325 511.904 521.179 476.278 520.546 440.677C520.157 418.655 504.485 401.889 482.779 397.971C466.573 395.051 454.819 404.371 454.357 420.918C454.04 432.233 454.868 443.622 454.065 454.889C453.359 464.671 455.865 471.363 464.601 477.008C471.902 481.705 478.107 488.567 483.752 495.332C502.076 517.33 507.795 543.319 505.605 571.498Z" fill="white"/>
+      </svg>
+      <span class="sep">|</span>
+      <span class="brand-text">CBH Mission CTRL</span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-meta">v2.0 · Sprint 2 · 2026</div>
+  </div>
+</div>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-inner">
+    <div class="hero-eyebrow">Your Tools</div>
+    <h1 class="hero-title">Mission <span class="accent">CTRL</span></h1>
+    <p class="hero-sub">Alle CBH Sales-Tools an einem Ort. Kein HubSpot. Kein Overhead. Kontrolle.</p>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main>
+  <div class="tools-label">Tools · 3 verfügbar</div>
+
+  <div class="tools-grid">
+
+    <!-- KACHEL 1: COLD CALLING -->
+    <div class="tool-card">
+      <div class="card-tag">Outbound · Sales</div>
+      <div class="card-name">Cold Calling</div>
+      <p class="card-desc">Outbound-Tracking, Joker-System und Tagesstatistik. Jeder Anruf zählt.</p>
+      <div class="card-footer">
+        <span class="status-badge live">Live</span>
+        <!-- Finn füllt die echte URL ein -->
+        <a class="card-cta" href="COLDCALL_URL">Öffnen</a>
+      </div>
+    </div>
+
+    <!-- KACHEL 2: CRM -->
+    <div class="tool-card">
+      <div class="card-tag">Pipeline · Kontakte</div>
+      <div class="card-name">CRM</div>
+      <p class="card-desc">Pipeline, Kontakte, Deals und Touchpoints. HubSpot-Ablösung, komplett in MISSION CTRL.</p>
+      <div class="card-footer">
+        <span class="status-badge staging">Staging</span>
+        <!-- Finn füllt die echte URL ein -->
+        <a class="card-cta" href="CRM_URL">Öffnen</a>
+      </div>
+    </div>
+
+    <!-- KACHEL 3: STORYTELLER -->
+    <div class="tool-card coming-soon">
+      <div class="card-tag">Content · LinkedIn</div>
+      <div class="card-name">Storyteller</div>
+      <p class="card-desc">Inhalts-Creation, LinkedIn-Reaktion und Artikel-Pipeline.</p>
+      <div class="card-footer">
+        <span class="status-badge coming-soon">Coming Soon</span>
+        <span class="card-cta disabled">Coming Soon</span>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <span class="footer-brand">CBH Mission CTRL · Alle Rechte vorbehalten</span>
+    <span class="footer-meta">Build 2026-05-19 · Sprint 2</span>
+  </div>
+</footer>
+
+</body>
+</html>

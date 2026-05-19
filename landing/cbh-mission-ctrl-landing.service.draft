@@ -1,0 +1,26 @@
+# cbh-mission-ctrl-landing.service – DRAFT FÜR KONSTANTIN
+# Pfad: /etc/systemd/system/cbh-mission-ctrl-landing.service
+#
+# Deployment-Schritte:
+#   1. sudo cp cbh-mission-ctrl-landing.service.draft /etc/systemd/system/cbh-mission-ctrl-landing.service
+#   2. Prüfe: /home/cbh/crm-landing/.env existiert (LANDING_APP_PREFIX, COLDCALL_URL, CRM_URL)
+#   3. sudo systemctl daemon-reload
+#   4. sudo systemctl enable cbh-mission-ctrl-landing
+#   5. sudo systemctl start cbh-mission-ctrl-landing
+#   6. curl http://127.0.0.1:8508/health → {"status":"ok"}
+
+[Unit]
+Description=CBH Mission CTRL Landing Page
+After=network.target
+
+[Service]
+Type=simple
+User=cbh
+WorkingDirectory=/home/cbh/crm-landing
+EnvironmentFile=/home/cbh/crm-landing/.env
+ExecStart=/home/cbh/crm-landing/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8508 --workers 1
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

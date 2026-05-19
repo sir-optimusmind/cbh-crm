@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ person.vorname }} {{ person.nachname }} – CBH CRM{% endblock %}
 {% block content %}
-<!-- Zurück-Button + Breadcrumb -->
+<!-- Zurück-Button (CRM-018) -->
 <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
   <a href="{{ prefix }}/personen" class="btn-secondary btn-sm">← Personen</a>
   <span style="font-size:13px; color:#aaa;">
@@ -13,15 +13,13 @@
 <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
   <div>
     <h1 style="font-size:26px; font-weight:700; margin:0 0 4px 0;">{{ person.vorname }} {{ person.nachname }}</h1>
-    {% if person.position %}
-    <div style="color:#aaa; font-size:14px;">{{ person.position }}</div>
-    {% endif %}
+    {% if person.position %}<div style="color:#aaa; font-size:14px;">{{ person.position }}</div>{% endif %}
   </div>
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
     <a href="{{ prefix }}/personen/{{ person.id }}/edit" class="btn-primary">Bearbeiten</a>
     <button
       hx-delete="{{ prefix }}/personen/{{ person.id }}"
-      hx-confirm="Person wirklich löschen? (Soft-Delete, kann wiederhergestellt werden)"
+      hx-confirm="Person wirklich löschen?"
       hx-target="#delete-result"
       hx-swap="innerHTML"
       class="btn-danger">Löschen</button>
@@ -29,26 +27,37 @@
 </div>
 <div id="delete-result"></div>
 
-<div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
-  <!-- Stammdaten -->
-  <div class="card">
-    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Kontaktdaten</div>
+<!-- Vision 5.1 Layout: 300px Sidebar + Hauptbereich -->
+<div style="display:grid; grid-template-columns:300px 1fr; gap:20px; align-items:start;">
 
-    <div style="display:grid; grid-template-columns:120px 1fr; gap:8px 12px; font-size:14px;">
-      <div style="color:#aaa; font-weight:600;">E-Mail</div>
-      <div>{% if person.email %}<a href="mailto:{{ person.email }}" style="color:#5870E2;">{{ person.email }}</a>{% else %}–{% endif %}</div>
+  <!-- SIDEBAR LINKS -->
+  <div style="display:flex; flex-direction:column; gap:14px;">
 
-      <div style="color:#aaa; font-weight:600;">Telefon</div>
-      <div>{{ person.telefon or '–' }}</div>
+    <!-- Basics -->
+    <div class="card">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#666; margin-bottom:12px;">Kontakt</div>
+      <div style="display:grid; grid-template-columns:auto 1fr; gap:6px 10px; font-size:13px;">
+        {% if person.email %}
+        <div style="color:#666;">E-Mail</div>
+        <div><a href="mailto:{{ person.email }}" style="color:#5870E2;">{{ person.email }}</a></div>
+        {% endif %}
+        {% if person.telefon %}
+        <div style="color:#666;">Tel.</div>
+        <div style="color:#ddd;">{{ person.telefon }}</div>
+        {% endif %}
+        {% if person.linkedin_url %}
+        <div style="color:#666;">LinkedIn</div>
+        <div><a href="{{ person.linkedin_url }}" target="_blank" style="color:#5870E2; word-break:break-all; font-size:11px;">Profil öffnen</a></div>
+        {% endif %}
+        {% if person.prospect_level %}
+        <div style="color:#666;">Level</div>
+        <div><span class="badge badge-blue">{{ person.prospect_level }}</span></div>
+        {% endif %}
+      </div>
 
-      <div style="color:#aaa; font-weight:600;">Position</div>
-      <div>{{ person.position or '–' }}</div>
-
-      <div style="color:#aaa; font-weight:600;">Prospect</div>
-      <div>{% if person.prospect_level %}<span class="badge badge-blue">{{ person.prospect_level }}</span>{% else %}–{% endif %}</div>
-
-      <div style="color:#aaa; font-weight:600;">Stimmung</div>
-      <div>
+      <!-- Wärme-Status (CRM-019) -->
+      <div style="margin-top:10px; padding-top:10px; border-top:1px solid #2a2a2a; display:flex; align-items:center; gap:8px;">
+        <span style="font-size:12px; color:#666;">Wärme:</span>
         {% if person.stimmung == 'heiss' %}
         <span class="badge" style="background:rgba(185,28,28,0.25); color:#FCA5A5;">heiss</span>
         {% elif person.stimmung == 'warm' %}
@@ -57,189 +66,273 @@
         <span class="badge" style="background:rgba(55,65,81,0.4); color:#9CA3AF;">kalt</span>
         {% endif %}
       </div>
-
-      <div style="color:#aaa; font-weight:600;">Letzter Kontakt</div>
-      <div style="font-size:13px; color:#aaa;">{{ person.last_contact_at[:10] if person.last_contact_at else '–' }}</div>
-
-      <div style="color:#aaa; font-weight:600;">Owner</div>
-      <div>{% if person.created_by %}<span class="badge badge-yellow">{{ person.created_by }}</span>{% else %}–{% endif %}</div>
     </div>
 
-    {% if person.notes %}
-    <div style="margin-top:16px; padding-top:16px; border-top:1px solid #333;">
-      <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:8px;">Notizen</div>
-      <div style="font-size:14px; color:#ddd; line-height:1.5; white-space:pre-wrap;">{{ person.notes }}</div>
-    </div>
-    {% endif %}
-
-    <div style="margin-top:16px; padding-top:16px; border-top:1px solid #333; font-size:12px; color:#666; display:grid; grid-template-columns:auto 1fr; gap:4px 12px;">
-      <span>Angelegt:</span><span>{{ person.created_at[:16].replace('T',' ') if person.created_at else '–' }} UTC</span>
-      <span>Geändert:</span><span>{{ person.updated_at[:16].replace('T',' ') if person.updated_at else '–' }} UTC</span>
-    </div>
-  </div>
-
-  <!-- Verknüpfte Unternehmen (CRM-007) -->
-  <div class="card">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-      <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa;">Unternehmen</div>
-      <button onclick="document.getElementById('link-company-panel').style.display='block'; this.style.display='none';"
-              class="btn-secondary btn-sm">+ Verknüpfen</button>
-    </div>
-
-    {% if verknuepfungen %}
-    <div style="display:flex; flex-direction:column; gap:8px;">
-      {% for v in verknuepfungen %}
-      <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#2a2a2a; border-radius:6px;">
-        <div>
-          <a href="{{ prefix }}/unternehmen/{{ v.unternehmen_id }}" style="color:#5870E2; text-decoration:none; font-weight:600;">{{ v.name }}</a>
-          {% if v.rolle %}<span style="color:#aaa; font-size:12px; margin-left:8px;">{{ v.rolle }}</span>{% endif %}
-          {% if v.primary_company %}<span class="badge badge-yellow" style="margin-left:8px;">Primary</span>{% endif %}
+    <!-- Pipeline-Status -->
+    {% if aktueller_deal %}
+    <div class="card">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#666; margin-bottom:10px;">Pipeline-Status</div>
+      <div style="font-size:13px;">
+        <div style="margin-bottom:4px;">
+          <a href="{{ prefix }}/deals/{{ aktueller_deal.id }}" style="color:#5870E2; text-decoration:none;">{{ aktueller_deal.titel }}</a>
         </div>
-        <div style="display:flex; gap:6px; align-items:center;">
-          {% if not v.primary_company %}
-          <button
-            hx-post="{{ prefix }}/personen/{{ person.id }}/unternehmen/{{ v.unternehmen_id }}/set-primary"
-            hx-target="body" hx-swap="outerHTML"
-            class="btn-secondary btn-sm" title="Als Primary setzen">★</button>
-          {% endif %}
-          <button
-            hx-delete="{{ prefix }}/personen/{{ person.id }}/unternehmen/{{ v.unternehmen_id }}"
-            hx-confirm="Verknüpfung auflösen?"
-            hx-target="body" hx-swap="outerHTML"
-            class="btn-danger btn-sm">×</button>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div style="color:#666; font-size:13px;">Noch kein Unternehmen verknüpft.</div>
-    {% endif %}
-
-    <!-- Verknüpfungs-Panel (CRM-007) -->
-    <div id="link-company-panel" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid #333;">
-      <form
-        hx-post="{{ prefix }}/personen/{{ person.id }}/unternehmen"
-        hx-target="body" hx-swap="outerHTML">
-        <div class="form-group">
-          <label>Unternehmen wählen</label>
-          <select name="unternehmen_id" required>
-            <option value="">– wählen –</option>
-            {% for u in alle_unternehmen %}
-            <option value="{{ u.id }}">{{ u.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Rolle (optional)</label>
-          <input type="text" name="rolle" placeholder="z.B. CEO, Ansprechpartner">
-        </div>
-        <div class="form-group" style="display:flex; align-items:center; gap:8px;">
-          <input type="checkbox" name="primary_company" id="pc_check" value="1" style="width:auto;">
-          <label for="pc_check" style="display:inline; color:#aaa; cursor:pointer;">Als Primary Company setzen</label>
-        </div>
-        <div style="display:flex; gap:8px;">
-          <button type="submit" class="btn-primary btn-sm">Verknüpfen</button>
-          <button type="button" onclick="document.getElementById('link-company-panel').style.display='none'; document.querySelector('[onclick*=link-company-panel]').style.display=''" class="btn-secondary btn-sm">Abbrechen</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-<!-- Touchpoint-Timeline (CRM-013 Sprint 2) -->
-<div class="card" id="touchpoint-section">
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa;">Touchpoint-History</div>
-    <button onclick="document.getElementById('add-tp-form').style.display='block'; this.style.display='none';" class="btn-primary btn-sm">+ Touchpoint</button>
-  </div>
-
-  <!-- Form -->
-  <div id="add-tp-form" style="display:none; padding:14px; background:#1a1a1a; border-radius:6px; margin-bottom:14px;">
-    <form method="post" action="{{ prefix }}/touchpoints">
-      <input type="hidden" name="person_id" value="{{ person.id }}">
-      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
-        <div class="form-group" style="margin:0;">
-          <label>Art</label>
-          <select name="art" required>
-            <option value="anruf">Anruf</option>
-            <option value="email">E-Mail</option>
-            <option value="meeting">Meeting</option>
-            <option value="linkedin">LinkedIn</option>
-            <option value="notiz">Notiz</option>
-            <option value="other">Sonstiges</option>
-          </select>
-        </div>
-        <div class="form-group" style="margin:0;">
-          <label>Datum *</label>
-          <input type="date" name="datum" required id="tp-datum-person">
-        </div>
-        <div class="form-group" style="margin:0;">
-          <label>Erstellt von *</label>
-          <select name="erstellt_von" required>
-            <option value="christian">Christian</option>
-            <option value="andre">André</option>
-            <option value="michi">Michi</option>
-            <option value="marco">Marco</option>
-            <option value="tim">Tim</option>
-          </select>
-        </div>
-      </div>
-      {% if aktive_deals %}
-      <div class="form-group">
-        <label>Deal-Verknüpfung (optional)</label>
-        <select name="deal_id">
-          <option value="">– kein –</option>
-          {% for d in aktive_deals %}
-          <option value="{{ d.id }}">{{ d.titel }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      {% endif %}
-      <div class="form-group">
-        <label>Inhalt *</label>
-        <textarea name="inhalt" rows="3" required placeholder="Was wurde besprochen?"></textarea>
-      </div>
-      <div class="form-group">
-        <label>Nächster Schritt</label>
-        <input type="text" name="naechster_schritt" placeholder="z.B. Angebot bis Freitag senden">
-      </div>
-      <div style="display:flex; gap:8px;">
-        <button type="submit" class="btn-primary btn-sm">Speichern</button>
-        <button type="button" onclick="document.getElementById('add-tp-form').style.display='none'; this.closest('#add-tp-form').previousElementSibling.querySelector('button').style.display=''" class="btn-secondary btn-sm">Abbrechen</button>
-      </div>
-    </form>
-  </div>
-
-  <!-- Timeline -->
-  {% if touchpoints %}
-  <div style="display:flex; flex-direction:column; gap:10px;">
-    {% for tp in touchpoints %}
-    <div style="padding:12px; background:#1a1a1a; border-radius:6px; border-left:3px solid
-      {% if tp.art == 'anruf' %}#5870E2
-      {% elif tp.art == 'meeting' %}#FFFB76
-      {% elif tp.art == 'email' %}#34D399
-      {% elif tp.art == 'linkedin' %}#3B82F6
-      {% else %}#555{% endif %};">
-      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px;">
-        <span class="badge" style="background:#2a2a2a; color:#aaa; text-transform:capitalize;">{{ tp.art }}</span>
-        <span style="font-size:12px; color:#777;">{{ tp.datum }}</span>
-        <span style="font-size:12px; color:#555;">von {{ tp.erstellt_von }}</span>
-        {% if tp.deal_titel %}
-        <span style="font-size:11px; color:#5870E2;">Deal: {{ tp.deal_titel }}</span>
+        <span class="badge" style="background:#222; color:#FFFB76; border:1px solid #444;">{{ aktueller_deal.stage }}</span>
+        {% if aktueller_deal.followup_datum %}
+        <div style="font-size:11px; color:#777; margin-top:6px;">Follow-up: {{ aktueller_deal.followup_datum }}</div>
         {% endif %}
       </div>
-      <div style="font-size:14px; color:#ddd; line-height:1.5; white-space:pre-wrap;">{{ tp.inhalt }}</div>
-      {% if tp.naechster_schritt %}
-      <div style="font-size:12px; color:#FFFB76; margin-top:6px;">→ {{ tp.naechster_schritt }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Stimmung gegenüber CBH – 5-Dot Mood-Meter (CRM-021) -->
+    <div class="card">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#666; margin-bottom:10px;">Stimmung uns gegenüber</div>
+      {% set mood = person.stimmung_cbh %}
+      {% if mood == 'sehr_positiv' %}{% set mood_dots = 5 %}{% set mood_color = '#34d17a' %}{% set mood_label = 'Sehr positiv' %}
+      {% elif mood == 'positiv' %}{% set mood_dots = 4 %}{% set mood_color = '#34d17a' %}{% set mood_label = 'Positiv' %}
+      {% elif mood == 'neutral' %}{% set mood_dots = 3 %}{% set mood_color = '#FFFB76' %}{% set mood_label = 'Neutral' %}
+      {% elif mood == 'skeptisch' %}{% set mood_dots = 2 %}{% set mood_color = '#ffaa33' %}{% set mood_label = 'Skeptisch' %}
+      {% elif mood == 'negativ' %}{% set mood_dots = 1 %}{% set mood_color = '#ff5a5a' %}{% set mood_label = 'Negativ' %}
+      {% else %}{% set mood_dots = 0 %}{% set mood_color = '#555' %}{% set mood_label = 'Nicht bewertet' %}
+      {% endif %}
+      <div style="display:flex; gap:5px; margin-bottom:8px;">
+        {% for i in range(1, 6) %}
+        <div style="width:30px; height:8px; border-radius:2px; background:{% if i <= mood_dots %}{{ mood_color }}{% else %}#2a2a2a{% endif %};"></div>
+        {% endfor %}
+      </div>
+      <div style="font-size:12px; color:#aaa;">{{ mood_label }}</div>
+    </div>
+
+    <!-- Umsatz-Historie -->
+    {% if person.umsatz_gesamt_cbh %}
+    <div class="card">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#666; margin-bottom:8px;">Umsatz mit CBH</div>
+      <div style="font-size:18px; font-weight:700; color:#FFFB76;">€ {{ "{:,.0f}".format(person.umsatz_gesamt_cbh) }}</div>
+    </div>
+    {% endif %}
+
+    <!-- LinkedIn-Trigger-Block (CRM-029) -->
+    {% if person.linkedin_trigger_notiz %}
+    <div style="background:#1a1a1a; border-left:3px solid #ffaa33; border-radius:4px; padding:12px 14px;">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#ffaa33; margin-bottom:6px;">LinkedIn Trigger</div>
+      {% if person.linkedin_trigger_datum %}
+      <div style="font-size:11px; color:#777; margin-bottom:4px;">{{ person.linkedin_trigger_datum }}</div>
+      {% endif %}
+      <div style="font-size:13px; color:#ddd; line-height:1.5;">{{ person.linkedin_trigger_notiz }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Verknüpfte Unternehmen -->
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#666;">Unternehmen</div>
+        <button onclick="document.getElementById('link-company-panel').style.display='block'; this.style.display='none';"
+                class="btn-secondary btn-sm">+ Verknüpfen</button>
+      </div>
+      {% if verknuepfungen %}
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        {% for v in verknuepfungen %}
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#2a2a2a; border-radius:4px;">
+          <div>
+            <a href="{{ prefix }}/unternehmen/{{ v.unternehmen_id }}" style="color:#5870E2; text-decoration:none; font-size:13px; font-weight:600;">{{ v.name }}</a>
+            {% if v.rolle %}<div style="color:#777; font-size:11px;">{{ v.rolle }}</div>{% endif %}
+            {% if v.primary_company %}<span class="badge badge-yellow" style="font-size:10px;">Primary</span>{% endif %}
+          </div>
+          <div style="display:flex; gap:4px;">
+            {% if not v.primary_company %}
+            <button hx-post="{{ prefix }}/personen/{{ person.id }}/unternehmen/{{ v.unternehmen_id }}/set-primary"
+                    hx-target="body" hx-swap="outerHTML"
+                    class="btn-secondary btn-sm" title="Primary">★</button>
+            {% endif %}
+            <button hx-delete="{{ prefix }}/personen/{{ person.id }}/unternehmen/{{ v.unternehmen_id }}"
+                    hx-confirm="Verknüpfung lösen?" hx-target="body" hx-swap="outerHTML"
+                    class="btn-danger btn-sm">×</button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="color:#555; font-size:12px;">Kein Unternehmen verknüpft.</div>
+      {% endif %}
+
+      <div id="link-company-panel" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid #333;">
+        <form hx-post="{{ prefix }}/personen/{{ person.id }}/unternehmen"
+              hx-target="body" hx-swap="outerHTML">
+          <div class="form-group">
+            <label>Unternehmen</label>
+            <select name="unternehmen_id" required>
+              <option value="">– wählen –</option>
+              {% for u in alle_unternehmen %}
+              <option value="{{ u.id }}">{{ u.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Rolle (optional)</label>
+            <input type="text" name="rolle" placeholder="z.B. CEO">
+          </div>
+          <div class="form-group" style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" name="primary_company" id="pc_check" value="1" style="width:auto;">
+            <label for="pc_check" style="display:inline; color:#aaa; cursor:pointer; font-size:13px;">Als Primary setzen</label>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="submit" class="btn-primary btn-sm">Verknüpfen</button>
+            <button type="button" onclick="document.getElementById('link-company-panel').style.display='none';" class="btn-secondary btn-sm">Abbrechen</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div><!-- /SIDEBAR -->
+
+  <!-- HAUPTBEREICH RECHTS -->
+  <div style="display:flex; flex-direction:column; gap:14px;">
+
+    <!-- Karriere-Stationen (CRM-021) -->
+    <div class="card">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#666; margin-bottom:12px;">Karriere-Stationen</div>
+      {% if person.karriere_stationen %}
+      <div style="font-size:13px; color:#ddd; line-height:1.7; white-space:pre-wrap;">{{ person.karriere_stationen }}</div>
+      {% else %}
+      <div style="color:#555; font-size:12px; font-style:italic;">Keine Stationen eingetragen –
+        <a href="{{ prefix }}/personen/{{ person.id }}/edit" style="color:#5870E2;">Bearbeiten</a>
+      </div>
       {% endif %}
     </div>
-    {% endfor %}
-  </div>
-  {% else %}
-  <div style="color:#555; font-size:13px; text-align:center; padding:24px 0;">
-    Noch keine Kontakte dokumentiert. <strong style="color:#aaa; cursor:pointer;" onclick="document.querySelector('.btn-primary.btn-sm').click()">Ersten Touchpoint anlegen</strong>
-  </div>
-  {% endif %}
-</div>
+
+    <!-- Persönlichkeit (CRM-021) -->
+    {% if person.persoenlichkeit_notizen %}
+    <div class="card">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#666; margin-bottom:10px;">Wie tickt {{ person.vorname }}?</div>
+      <div style="font-size:13px; color:#ddd; line-height:1.6; white-space:pre-wrap;">{{ person.persoenlichkeit_notizen }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Notizen -->
+    {% if person.notes %}
+    <div class="card">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#666; margin-bottom:10px;">Notizen</div>
+      <div style="font-size:13px; color:#ddd; line-height:1.5; white-space:pre-wrap;">{{ person.notes }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Touchpoint-Timeline (CRM-013) -->
+    <div class="card" id="touchpoint-section">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#666;">Touchpoint-History</div>
+        <button onclick="document.getElementById('add-tp-form').style.display='block'; this.style.display='none';" class="btn-primary btn-sm">+ Touchpoint</button>
+      </div>
+
+      <!-- Touchpoint-Formular -->
+      <div id="add-tp-form" style="display:none; padding:14px; background:#1a1a1a; border-radius:6px; margin-bottom:14px;">
+        <form method="post" action="{{ prefix }}/touchpoints">
+          <input type="hidden" name="person_id" value="{{ person.id }}">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
+            <div class="form-group" style="margin:0;">
+              <label>Art</label>
+              <select name="art" required>
+                <option value="anruf">Anruf</option>
+                <option value="email">E-Mail</option>
+                <option value="meeting">Meeting</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="notiz">Notiz</option>
+                <option value="other">Sonstiges</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>Datum *</label>
+              <input type="date" name="datum" required id="tp-datum-person">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>Erstellt von *</label>
+              <select name="erstellt_von" required>
+                <option value="christian">Christian</option>
+                <option value="andre">André</option>
+                <option value="michi">Michi</option>
+                <option value="marco">Marco</option>
+                <option value="tim">Tim</option>
+              </select>
+            </div>
+          </div>
+          {% if aktive_deals %}
+          <div class="form-group">
+            <label>Deal-Verknüpfung (optional)</label>
+            <select name="deal_id">
+              <option value="">– kein –</option>
+              {% for d in aktive_deals %}
+              <option value="{{ d.id }}">{{ d.titel }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+          <div class="form-group">
+            <label>Inhalt *</label>
+            <textarea name="inhalt" rows="3" required placeholder="Was wurde besprochen?"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Details (ausführlich, optional)</label>
+            <textarea name="details" rows="2" placeholder="Detailnotizen, Quellenlinks..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Nächster Schritt</label>
+            <input type="text" name="naechster_schritt" placeholder="z.B. Angebot bis Freitag">
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="submit" class="btn-primary btn-sm">Speichern</button>
+            <button type="button" onclick="document.getElementById('add-tp-form').style.display='none';" class="btn-secondary btn-sm">Abbrechen</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Timeline -->
+      {% if touchpoints %}
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        {% for tp in touchpoints %}
+        <div style="padding:12px; background:#1a1a1a; border-radius:6px; border-left:3px solid
+          {% if tp.art == 'anruf' %}#5870E2
+          {% elif tp.art == 'meeting' %}#FFFB76
+          {% elif tp.art == 'email' %}#34D399
+          {% elif tp.art == 'linkedin' %}#3B82F6
+          {% else %}#555{% endif %};">
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px;">
+            <span class="badge" style="background:#2a2a2a; color:#aaa; text-transform:capitalize;">{{ tp.art }}</span>
+            <span style="font-size:12px; color:#777;">{{ tp.datum }}</span>
+            <span style="font-size:12px; color:#555;">von {{ tp.erstellt_von }}</span>
+            {% if tp.deal_titel %}
+            <span style="font-size:11px; color:#5870E2;">Deal: {{ tp.deal_titel }}</span>
+            {% endif %}
+          </div>
+          <div style="font-size:13px; color:#ddd; line-height:1.5; white-space:pre-wrap;">{{ tp.inhalt }}</div>
+          {% if tp.details %}
+          <div style="margin-top:6px;">
+            <button onclick="var d=this.nextElementSibling; d.style.display=d.style.display==='none'?'block':'none';"
+                    style="background:none; border:none; color:#5870E2; font-size:11px; cursor:pointer; padding:0;">▼ Details anzeigen</button>
+            <div style="display:none; margin-top:6px; font-size:12px; color:#aaa; line-height:1.5; white-space:pre-wrap;">{{ tp.details }}</div>
+          </div>
+          {% endif %}
+          {% if tp.naechster_schritt %}
+          <div style="font-size:12px; color:#FFFB76; margin-top:6px;">→ {{ tp.naechster_schritt }}</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="color:#555; font-size:13px; text-align:center; padding:24px 0;">
+        Noch keine Kontakte dokumentiert.
+        <span style="color:#aaa; cursor:pointer;" onclick="document.querySelector('#touchpoint-section .btn-primary').click()">Ersten Touchpoint anlegen</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Meta -->
+    <div style="font-size:11px; color:#555; display:grid; grid-template-columns:auto 1fr; gap:4px 10px;">
+      <span>Angelegt:</span><span>{{ person.created_at[:16].replace('T',' ') if person.created_at else '–' }} UTC</span>
+      <span>Geändert:</span><span>{{ person.updated_at[:16].replace('T',' ') if person.updated_at else '–' }} UTC</span>
+      <span>Owner:</span><span>{% if person.created_by %}<span class="badge badge-yellow">{{ person.created_by }}</span>{% else %}–{% endif %}</span>
+    </div>
+
+  </div><!-- /HAUPTBEREICH -->
+</div><!-- /GRID -->
 {% endblock %}
 {% block scripts %}
 <script>

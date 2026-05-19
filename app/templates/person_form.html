@@ -6,7 +6,7 @@
   <h1 style="font-size:22px; font-weight:700; margin:0;">{{ 'Person bearbeiten' if person else 'Neue Person anlegen' }}</h1>
 </div>
 
-<div class="card" style="max-width:680px;">
+<div class="card" style="max-width:780px;">
   <form
     {% if person %}
     hx-put="{{ prefix }}/personen/{{ person.id }}"
@@ -18,6 +18,9 @@
     style="margin:0;">
 
     <div id="form-result"></div>
+
+    <!-- Basis-Daten -->
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#666; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid #2a2a2a;">Stammdaten</div>
 
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
       <div class="form-group">
@@ -32,17 +35,17 @@
 
     <div class="form-group">
       <label>E-Mail</label>
-      <input type="email" name="email" value="{{ person.email if person else '' }}" placeholder="max@firma.de">
+      <input type="email" name="email" value="{{ person.email if person and person.email else '' }}" placeholder="max@firma.de">
     </div>
 
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
       <div class="form-group">
         <label>Telefon</label>
-        <input type="text" name="telefon" value="{{ person.telefon if person else '' }}" placeholder="+49 89 123456">
+        <input type="text" name="telefon" value="{{ person.telefon if person and person.telefon else '' }}" placeholder="+49 89 123456">
       </div>
       <div class="form-group">
         <label>Position</label>
-        <input type="text" name="position" value="{{ person.position if person else '' }}" placeholder="Head of Sales">
+        <input type="text" name="position" value="{{ person.position if person and person.position else '' }}" placeholder="Head of Sales">
       </div>
     </div>
 
@@ -57,12 +60,8 @@
         </select>
       </div>
       <div class="form-group">
-        <label>Stimmung</label>
-        <select name="stimmung">
-          {% for s in (stimmungen or ['kalt','warm','heiss']) %}
-          <option value="{{ s }}" {% if (person and person.stimmung == s) or (not person and s == 'kalt') %}selected{% endif %}>{{ s }}</option>
-          {% endfor %}
-        </select>
+        <label>LinkedIn-URL</label>
+        <input type="url" name="linkedin_url" value="{{ person.linkedin_url if person and person.linkedin_url else '' }}" placeholder="https://linkedin.com/in/...">
       </div>
     </div>
 
@@ -77,19 +76,87 @@
         </select>
       </div>
       <div class="form-group">
-        <label>Letzter Kontakt (Datum)</label>
+        <label>Letzter Kontakt</label>
         <input type="date" name="last_contact_at"
-          value="{{ person.last_contact_at[:10] if person and person.last_contact_at else '' }}"
-          placeholder="YYYY-MM-DD">
+          value="{{ person.last_contact_at[:10] if person and person.last_contact_at else '' }}">
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div class="form-group">
+        <label>Wärme-Status (CRM-Liste)</label>
+        <select name="stimmung">
+          {% for s in (stimmungen or ['kalt','warm','heiss']) %}
+          <option value="{{ s }}" {% if (person and person.stimmung == s) or (not person and s == 'kalt') %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Stimmung uns gegenüber</label>
+        <select name="stimmung_cbh">
+          <option value="">– nicht bewertet –</option>
+          {% for s in (stimmungen_cbh or ['sehr_positiv','positiv','neutral','skeptisch','negativ']) %}
+          <option value="{{ s }}" {% if person and person.stimmung_cbh == s %}selected{% endif %}>
+            {% if s == 'sehr_positiv' %}Sehr positiv
+            {% elif s == 'positiv' %}Positiv
+            {% elif s == 'neutral' %}Neutral
+            {% elif s == 'skeptisch' %}Skeptisch
+            {% elif s == 'negativ' %}Negativ
+            {% else %}{{ s }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
       </div>
     </div>
 
     <div class="form-group">
       <label>Notizen</label>
-      <textarea name="notes" rows="3" placeholder="Freie Notizen...">{{ person.notes if person else '' }}</textarea>
+      <textarea name="notes" rows="3" placeholder="Freie Notizen...">{{ person.notes if person and person.notes else '' }}</textarea>
     </div>
 
-    <div style="display:flex; gap:12px; margin-top:8px;">
+    <!-- Vision-Felder (CRM-021) -->
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#666; margin-top:20px; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid #2a2a2a; padding-top:4px;">Profil & Karriere (CRM-021)</div>
+
+    <div class="form-group">
+      <label>Karriere-Stationen <span style="color:#555; font-weight:400;">(Freitext, z.B. eine Station pro Zeile)</span></label>
+      <textarea name="karriere_stationen" rows="5"
+        placeholder="2020–heute: CEO bei Müller Maschinenbau&#10;2015–2020: Head of Sales bei Acme GmbH&#10;...">{{ person.karriere_stationen if person and person.karriere_stationen else '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Wie tickt {{ person.vorname if person and person.vorname else 'die Person' }}? <span style="color:#555; font-weight:400;">(Persönlichkeit, Stil, Trigger)</span></label>
+      <textarea name="persoenlichkeit_notizen" rows="4"
+        placeholder="z.B. Entscheidungsfreudig, braucht Zahlen. Reagiert gut auf konkrete Beispiele. Mag kein Consulting-Sprech...">{{ person.persoenlichkeit_notizen if person and person.persoenlichkeit_notizen else '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Umsatz gesamt mit CBH (€, manuell)</label>
+      <input type="number" name="umsatz_gesamt_cbh" step="0.01"
+        value="{{ person.umsatz_gesamt_cbh if person and person.umsatz_gesamt_cbh else '' }}"
+        placeholder="0.00">
+    </div>
+
+    <!-- LinkedIn-Trigger (CRM-029) -->
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#666; margin-top:20px; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid #2a2a2a; padding-top:4px;">LinkedIn-Trigger (CRM-029)</div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div class="form-group">
+        <label>Trigger-Datum</label>
+        <input type="date" name="linkedin_trigger_datum"
+          value="{{ person.linkedin_trigger_datum if person and person.linkedin_trigger_datum else '' }}">
+      </div>
+      <div style="display:flex; align-items:flex-end; padding-bottom:16px;">
+        <div style="font-size:12px; color:#555;">Setze ein Datum wenn ein relevanter LinkedIn-Moment aufgetaucht ist (Jobwechsel, Post, M&A).</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Trigger-Notiz (Sense of Opportunity)</label>
+      <textarea name="linkedin_trigger_notiz" rows="2"
+        placeholder="z.B. Jobwechsel zu Müller MB – perfekter Zeitpunkt für Erstkontakt">{{ person.linkedin_trigger_notiz if person and person.linkedin_trigger_notiz else '' }}</textarea>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:20px;">
       <button type="submit" class="btn-primary">{{ 'Speichern' if person else 'Anlegen' }}</button>
       <a href="{{ prefix }}/personen{% if person %}/{{ person.id }}{% endif %}" class="btn-secondary">Abbrechen</a>
     </div>
@@ -98,7 +165,6 @@
 {% endblock %}
 {% block scripts %}
 <script>
-// Nach erfolgreichem HTMX-Submit: Redirect auf Detail-Seite
 document.body.addEventListener('htmx:afterRequest', function(evt) {
   var resp = evt.detail.xhr;
   if (resp.status === 200 || resp.status === 201) {

@@ -1,16 +1,17 @@
 """
-routes/personen.py – CRM-003 (Person CRUD) + CRM-004 (Detail) + CRM-007 (n:m)
-                   + CRM-QW-02 (Stimmung) + CRM-QW-03 (Letzter Kontakt Filter)
+routes/personen.py – CRM-003/004/007 + CRM-QW-02/03 + CRM-021 (Vision-Felder) + CRM-029 (LinkedIn-Trigger)
 
 Regeln:
-  - APP_PREFIX kommt aus main.py via router-Include (root_path reicht)
+  - APP_PREFIX kommt via root_path
   - Audit-Log bei JEDEM Create/Update/Delete
-  - PUT = Full Replacement (MQ-01)
-  - user aus X-Forwarded-User Header, Fallback "system" (MQ-03)
-  - changed_fields bei CREATE = vollstaendig, UPDATE = nur Diff (MQ-04)
+  - PUT = Full Replacement
+  - user aus X-Forwarded-User Header, Fallback "system"
   - Soft-Delete via deleted_at
-  - stimmung: ENUM kalt/warm/heiss, Default kalt (CRM-QW-02)
-  - last_contact_at: nullable ISO8601, NULL = nie Kontakt (CRM-QW-03)
+  - stimmung: kalt/warm/heiss (CRM-QW-02)
+  - stimmung_cbh: sehr_positiv/positiv/neutral/skeptisch/negativ (CRM-021 Mood-Meter)
+  - karriere_stationen: JSON-Text (CRM-021)
+  - persoenlichkeit_notizen: Freitext (CRM-021)
+  - linkedin_trigger_notiz + linkedin_trigger_datum (CRM-029)
 """
 
 import os
@@ -24,12 +25,10 @@ from fastapi.templating import Jinja2Templates
 
 from app.db import get_connection, write_audit_log, now_iso
 
-# BUG-03: E-Mail-Format-Validierung (server-seitig)
 _EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def _validate_email(email: Optional[str]) -> Optional[str]:
-    """Gibt None zurück wenn email leer, wirft ValueError bei ungültigem Format."""
     if not email:
         return None
     cleaned = email.strip()
@@ -39,22 +38,18 @@ def _validate_email(email: Optional[str]) -> Optional[str]:
         raise ValueError(f"Ungültiges E-Mail-Format: {cleaned}")
     return cleaned
 
-# ─── Router + Templates ───────────────────────────────────────────────────────
-router = APIRouter()
 
+router = APIRouter()
 _TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
 templates = Jinja2Templates(directory=_TEMPLATE_DIR)
 
-# Owner-Liste (CBH-Team)
 OWNERS = ["christian", "andre", "michi", "marco", "tim"]
 PROSPECT_LEVELS = ["Owner", "CxO", "Head", "Manager", "Other"]
 STIMMUNGEN = ["kalt", "warm", "heiss"]
+STIMMUNGEN_CBH = ["sehr_positiv", "positiv", "neutral", "skeptisch", "negativ"]
 
-
-# ─── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
 def get_user(request: Request) -> str:
-    """Liest X-Forwarded-User Header, Fallback 'system'."""
     return request.headers.get("X-Forwarded-User", "system")
 
 
@@ -63,11 +58,9 @@ def get_client_ip(request: Request) -> Optional[str]:
 
 
 def _enrich_person(row) -> dict:
-    """Wandelt sqlite3.Row in dict um + haengt Primary-Company dran."""
     p = dict(row)
     conn = get_connection()
     try:
-        # Primary Company suchen
         pu = conn.execute(
             """SELECT pu.unternehmen_id, u.name
                FROM person_unternehmen pu
@@ -88,12 +81,7 @@ def _enrich_person(row) -> dict:
 
 
 def _last_contact_sql_condition(letzter_kontakt: str) -> tuple[str, list]:
-    """
-    Gibt SQL-Fragment + Parameter für den Letzter-Kontakt-Filter zurück.
-    Nutzt last_contact_at Feld.
-    """
     now = datetime.now(timezone.utc)
-
     if letzter_kontakt == "heute":
         cutoff = (now - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
         return " AND p.last_contact_at >= ?", [cutoff]
@@ -115,7 +103,7 @@ def _last_contact_sql_condition(letzter_kontakt: str) -> tuple[str, list]:
         return "", []
 
 
-# ─── CRM-003: Listen-View ────────────────────────────────────────────────────
+# ─── Listen-View ─────────────────────────────────────────────────────────────
 
 @router.get("/personen", response_class=HTMLResponse)
 def personen_liste(
@@ -128,13 +116,8 @@ def personen_liste(
     prefix = request.scope.get("root_path", "")
     conn = get_connection()
     try:
-        sql = """
-            SELECT p.*
-            FROM person p
-            WHERE p.deleted_at IS NULL
-        """
+        sql = "SELECT p.* FROM person p WHERE p.deleted_at IS NULL"
         params = []
-
         if q:
             sql += " AND (p.vorname || ' ' || p.nachname LIKE ? OR p.email LIKE ?)"
             params += [f"%{q}%", f"%{q}%"]
@@ -144,12 +127,9 @@ def personen_liste(
         if stimmung:
             sql += " AND p.stimmung = ?"
             params.append(stimmung)
-
-        # Letzter-Kontakt-Filter
         lk_sql, lk_params = _last_contact_sql_condition(letzter_kontakt)
         sql += lk_sql
         params += lk_params
-
         sql += " ORDER BY p.nachname, p.vorname"
         rows = conn.execute(sql, params).fetchall()
     finally:
@@ -168,7 +148,7 @@ def personen_liste(
     })
 
 
-# ─── CRM-003: Anlegen-Form ───────────────────────────────────────────────────
+# ─── Anlegen-Form ─────────────────────────────────────────────────────────────
 
 @router.get("/personen/neu", response_class=HTMLResponse)
 def person_neu_form(request: Request):
@@ -178,10 +158,11 @@ def person_neu_form(request: Request):
         "person": None,
         "owners": OWNERS,
         "stimmungen": STIMMUNGEN,
+        "stimmungen_cbh": STIMMUNGEN_CBH,
     })
 
 
-# ─── CRM-003: POST Anlegen ───────────────────────────────────────────────────
+# ─── POST Anlegen ─────────────────────────────────────────────────────────────
 
 @router.post("/personen")
 async def person_erstellen(
@@ -196,12 +177,17 @@ async def person_erstellen(
     last_contact_at: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
     created_by: Optional[str] = Form(None),
+    linkedin_url: Optional[str] = Form(None),
+    karriere_stationen: Optional[str] = Form(None),
+    stimmung_cbh: Optional[str] = Form(None),
+    persoenlichkeit_notizen: Optional[str] = Form(None),
+    linkedin_trigger_notiz: Optional[str] = Form(None),
+    linkedin_trigger_datum: Optional[str] = Form(None),
 ):
     prefix = request.scope.get("root_path", "")
     user = get_user(request)
     ip = get_client_ip(request)
 
-    # BUG-03: E-Mail-Format-Validierung vor DB-Schreiben
     try:
         email = _validate_email(email)
     except ValueError as ve:
@@ -210,35 +196,42 @@ async def person_erstellen(
             status_code=422
         )
 
-    # Normalisierung
     telefon = telefon.strip() or None if telefon else None
     position = position.strip() or None if position else None
     prospect_level = prospect_level or None
     stimmung = stimmung if stimmung in STIMMUNGEN else "kalt"
+    stimmung_cbh = stimmung_cbh if stimmung_cbh in STIMMUNGEN_CBH else None
     last_contact_at = last_contact_at.strip() or None if last_contact_at else None
     notes = notes.strip() or None if notes else None
     created_by = created_by or user
+    linkedin_url = linkedin_url.strip() or None if linkedin_url else None
+    karriere_stationen = karriere_stationen.strip() or None if karriere_stationen else None
+    persoenlichkeit_notizen = persoenlichkeit_notizen.strip() or None if persoenlichkeit_notizen else None
+    linkedin_trigger_notiz = linkedin_trigger_notiz.strip() or None if linkedin_trigger_notiz else None
+    linkedin_trigger_datum = linkedin_trigger_datum.strip() or None if linkedin_trigger_datum else None
 
     conn = get_connection()
     try:
         ts = now_iso()
         cur = conn.execute(
             """INSERT INTO person (vorname, nachname, email, telefon, position, prospect_level,
-               stimmung, last_contact_at, notes, created_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               stimmung, last_contact_at, notes, created_by, created_at, updated_at,
+               linkedin_url, karriere_stationen, stimmung_cbh, persoenlichkeit_notizen,
+               linkedin_trigger_notiz, linkedin_trigger_datum)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (vorname, nachname, email, telefon, position, prospect_level,
-             stimmung, last_contact_at, notes, created_by, ts, ts)
+             stimmung, last_contact_at, notes, created_by, ts, ts,
+             linkedin_url, karriere_stationen, stimmung_cbh, persoenlichkeit_notizen,
+             linkedin_trigger_notiz, linkedin_trigger_datum)
         )
         new_id = cur.lastrowid
-
-        # Audit-Log: CREATE mit vollstaendigem Datensatz (MQ-04)
         write_audit_log(conn,
             user=user, entity_type="person", entity_id=new_id, action="CREATE",
             changed_fields={
                 "vorname": vorname, "nachname": nachname, "email": email,
                 "telefon": telefon, "position": position, "prospect_level": prospect_level,
-                "stimmung": stimmung, "last_contact_at": last_contact_at,
-                "notes": notes, "created_by": created_by,
+                "stimmung": stimmung, "stimmung_cbh": stimmung_cbh,
+                "last_contact_at": last_contact_at, "notes": notes, "created_by": created_by,
             },
             ip_address=ip
         )
@@ -252,7 +245,7 @@ async def person_erstellen(
     return JSONResponse({"redirect": f"{prefix}/personen/{new_id}"})
 
 
-# ─── CRM-004: Detail-View ────────────────────────────────────────────────────
+# ─── Detail-View ──────────────────────────────────────────────────────────────
 
 @router.get("/personen/{person_id}", response_class=HTMLResponse)
 def person_detail(request: Request, person_id: int):
@@ -267,7 +260,6 @@ def person_detail(request: Request, person_id: int):
 
         person = dict(row)
 
-        # Verknüpfte Unternehmen – BUG-01 Fix: nur nicht-gelöschte Firmen anzeigen
         verknuepfungen = conn.execute(
             """SELECT pu.unternehmen_id, pu.rolle, pu.primary_company, u.name
                FROM person_unternehmen pu
@@ -278,13 +270,11 @@ def person_detail(request: Request, person_id: int):
         ).fetchall()
         verknuepfungen = [dict(v) for v in verknuepfungen]
 
-        # Alle aktiven Unternehmen für Verknüpfungs-Dropdown
         alle_unt = conn.execute(
             "SELECT id, name FROM unternehmen WHERE deleted_at IS NULL ORDER BY name"
         ).fetchall()
         alle_unternehmen = [dict(u) for u in alle_unt]
 
-        # CRM-013: Touchpoints fuer diese Person (direkt + via Deals)
         touchpoints_raw = conn.execute(
             """SELECT t.*, d.titel as deal_titel
                FROM touchpoint t
@@ -297,14 +287,23 @@ def person_detail(request: Request, person_id: int):
         ).fetchall()
         touchpoints = [dict(tp) for tp in touchpoints_raw]
 
-        # Aktive Deals dieser Person fuer Touchpoint-Dropdown
         aktive_deals_raw = conn.execute(
             """SELECT id, titel FROM deal
-               WHERE person_id=? AND deleted_at IS NULL AND stage NOT IN ("won","lost")
+               WHERE person_id=? AND deleted_at IS NULL AND stage NOT IN ('won','lost')
                ORDER BY created_at DESC""",
             (person_id,)
         ).fetchall()
         aktive_deals = [dict(d) for d in aktive_deals_raw]
+
+        # Aktueller Deal-Stage für Pipeline-Status Block (neuester aktiver Deal)
+        aktueller_deal = conn.execute(
+            """SELECT d.id, d.titel, d.stage, d.followup_datum
+               FROM deal d
+               WHERE d.person_id=? AND d.deleted_at IS NULL
+               ORDER BY d.created_at DESC LIMIT 1""",
+            (person_id,)
+        ).fetchone()
+        aktueller_deal = dict(aktueller_deal) if aktueller_deal else None
 
     finally:
         conn.close()
@@ -315,12 +314,14 @@ def person_detail(request: Request, person_id: int):
         "verknuepfungen": verknuepfungen,
         "alle_unternehmen": alle_unternehmen,
         "stimmungen": STIMMUNGEN,
+        "stimmungen_cbh": STIMMUNGEN_CBH,
         "touchpoints": touchpoints,
         "aktive_deals": aktive_deals,
+        "aktueller_deal": aktueller_deal,
     })
 
 
-# ─── CRM-003: Edit-Form ──────────────────────────────────────────────────────
+# ─── Edit-Form ────────────────────────────────────────────────────────────────
 
 @router.get("/personen/{person_id}/edit", response_class=HTMLResponse)
 def person_edit_form(request: Request, person_id: int):
@@ -341,10 +342,11 @@ def person_edit_form(request: Request, person_id: int):
         "person": person,
         "owners": OWNERS,
         "stimmungen": STIMMUNGEN,
+        "stimmungen_cbh": STIMMUNGEN_CBH,
     })
 
 
-# ─── CRM-003: PUT Full Replacement ───────────────────────────────────────────
+# ─── PUT Full Replacement ─────────────────────────────────────────────────────
 
 @router.put("/personen/{person_id}")
 async def person_aktualisieren(
@@ -360,12 +362,18 @@ async def person_aktualisieren(
     last_contact_at: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
     created_by: Optional[str] = Form(None),
+    linkedin_url: Optional[str] = Form(None),
+    karriere_stationen: Optional[str] = Form(None),
+    stimmung_cbh: Optional[str] = Form(None),
+    persoenlichkeit_notizen: Optional[str] = Form(None),
+    umsatz_gesamt_cbh: Optional[float] = Form(None),
+    linkedin_trigger_notiz: Optional[str] = Form(None),
+    linkedin_trigger_datum: Optional[str] = Form(None),
 ):
     prefix = request.scope.get("root_path", "")
     user = get_user(request)
     ip = get_client_ip(request)
 
-    # BUG-03: E-Mail-Format-Validierung vor DB-Schreiben
     try:
         email = _validate_email(email)
     except ValueError as ve:
@@ -378,9 +386,15 @@ async def person_aktualisieren(
     position = position.strip() or None if position else None
     prospect_level = prospect_level or None
     stimmung = stimmung if stimmung in STIMMUNGEN else "kalt"
+    stimmung_cbh = stimmung_cbh if stimmung_cbh in STIMMUNGEN_CBH else None
     last_contact_at = last_contact_at.strip() or None if last_contact_at else None
     notes = notes.strip() or None if notes else None
     created_by = created_by or user
+    linkedin_url = linkedin_url.strip() or None if linkedin_url else None
+    karriere_stationen = karriere_stationen.strip() or None if karriere_stationen else None
+    persoenlichkeit_notizen = persoenlichkeit_notizen.strip() or None if persoenlichkeit_notizen else None
+    linkedin_trigger_notiz = linkedin_trigger_notiz.strip() or None if linkedin_trigger_notiz else None
+    linkedin_trigger_datum = linkedin_trigger_datum.strip() or None if linkedin_trigger_datum else None
 
     conn = get_connection()
     try:
@@ -394,18 +408,29 @@ async def person_aktualisieren(
         ts = now_iso()
         conn.execute(
             """UPDATE person SET vorname=?, nachname=?, email=?, telefon=?, position=?,
-               prospect_level=?, stimmung=?, last_contact_at=?, notes=?, created_by=?, updated_at=?
+               prospect_level=?, stimmung=?, last_contact_at=?, notes=?, created_by=?,
+               updated_at=?, linkedin_url=?, karriere_stationen=?, stimmung_cbh=?,
+               persoenlichkeit_notizen=?, umsatz_gesamt_cbh=?,
+               linkedin_trigger_notiz=?, linkedin_trigger_datum=?
                WHERE id = ?""",
             (vorname, nachname, email, telefon, position, prospect_level,
-             stimmung, last_contact_at, notes, created_by, ts, person_id)
+             stimmung, last_contact_at, notes, created_by, ts,
+             linkedin_url, karriere_stationen, stimmung_cbh,
+             persoenlichkeit_notizen, umsatz_gesamt_cbh,
+             linkedin_trigger_notiz, linkedin_trigger_datum,
+             person_id)
         )
 
-        # Diff berechnen (MQ-04): nur geaenderte Felder loggen
         new_vals = {
             "vorname": vorname, "nachname": nachname, "email": email,
             "telefon": telefon, "position": position, "prospect_level": prospect_level,
-            "stimmung": stimmung, "last_contact_at": last_contact_at,
-            "notes": notes, "created_by": created_by,
+            "stimmung": stimmung, "stimmung_cbh": stimmung_cbh,
+            "last_contact_at": last_contact_at, "notes": notes, "created_by": created_by,
+            "linkedin_url": linkedin_url, "karriere_stationen": karriere_stationen,
+            "persoenlichkeit_notizen": persoenlichkeit_notizen,
+            "umsatz_gesamt_cbh": umsatz_gesamt_cbh,
+            "linkedin_trigger_notiz": linkedin_trigger_notiz,
+            "linkedin_trigger_datum": linkedin_trigger_datum,
         }
         diff = {k: {"old": old.get(k), "new": v} for k, v in new_vals.items() if old.get(k) != v}
 
@@ -426,7 +451,7 @@ async def person_aktualisieren(
     return JSONResponse({"redirect": f"{prefix}/personen/{person_id}"})
 
 
-# ─── CRM-003: DELETE (Soft-Delete) ───────────────────────────────────────────
+# ─── DELETE (Soft-Delete) ─────────────────────────────────────────────────────
 
 @router.delete("/personen/{person_id}")
 async def person_loeschen(request: Request, person_id: int):
@@ -481,13 +506,11 @@ async def person_unternehmen_verknuepfen(
 
     conn = get_connection()
     try:
-        # Prüfen ob Person + Unternehmen existieren
         p = conn.execute("SELECT id FROM person WHERE id=? AND deleted_at IS NULL", (person_id,)).fetchone()
         u = conn.execute("SELECT id FROM unternehmen WHERE id=? AND deleted_at IS NULL", (unternehmen_id,)).fetchone()
         if not p or not u:
             raise HTTPException(status_code=404, detail="Person oder Unternehmen nicht gefunden")
 
-        # BUG-04: Doppelte Verknüpfung → 422 statt 303
         existing_link = conn.execute(
             "SELECT 1 FROM person_unternehmen WHERE person_id=? AND unternehmen_id=?",
             (person_id, unternehmen_id)
@@ -498,7 +521,6 @@ async def person_unternehmen_verknuepfen(
                 status_code=422
             )
 
-        # Wenn primary gesetzt: alle anderen primary=0 setzen
         if is_primary:
             conn.execute(
                 "UPDATE person_unternehmen SET primary_company=0 WHERE person_id=?",
@@ -528,8 +550,6 @@ async def person_unternehmen_verknuepfen(
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url=f"{prefix}/personen/{person_id}", status_code=303)
 
-
-# ─── CRM-007: Primary setzen ─────────────────────────────────────────────────
 
 @router.post("/personen/{person_id}/unternehmen/{unternehmen_id}/set-primary")
 async def person_unternehmen_set_primary(request: Request, person_id: int, unternehmen_id: int):
@@ -561,8 +581,6 @@ async def person_unternehmen_set_primary(request: Request, person_id: int, unter
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url=f"{prefix}/personen/{person_id}", status_code=303)
 
-
-# ─── CRM-007: Verknüpfung lösen (von Personen-Seite) ─────────────────────────
 
 @router.delete("/personen/{person_id}/unternehmen/{unternehmen_id}")
 async def person_unternehmen_loesen(request: Request, person_id: int, unternehmen_id: int):

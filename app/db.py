@@ -5,7 +5,8 @@ Verantwortlich fuer:
   - Automatische Schema-Anlage beim App-Start (idempotent via CREATE TABLE IF NOT EXISTS)
   - audit_log-Hilfsfunktion fuer alle Schreib-Operationen
   - Migration 002: stimmung + last_contact_at (idempotent via PRAGMA table_info)
-  - Migration 003: Sprint-2-Schema (deal, touchpoint, project, stage_definition)
+  - Migration Sprint-2: deal, touchpoint, project, stage_definition
+  - Migration 003: Vision-Felder Sprint 2 (Person + Unternehmen Detail)
 """
 
 import os
@@ -22,6 +23,7 @@ DB_PATH = os.getenv("CRM_DB_PATH", str(_DEFAULT_DB_PATH))
 _MIGRATION_001 = Path(__file__).parent.parent / "migrations" / "001_initial_schema.sql"
 _MIGRATION_002 = Path(__file__).parent.parent / "migrations" / "002_stimmung_field.sql"
 _MIGRATION_003 = Path(__file__).parent.parent / "migrations" / "002_sprint2_schema.sql"
+_MIGRATION_004 = Path(__file__).parent.parent / "migrations" / "003_vision_fields.sql"
 
 
 def get_connection() -> sqlite3.Connection:
@@ -106,6 +108,82 @@ def _run_migration_sprint2(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
+def _run_migration_vision(conn: sqlite3.Connection) -> None:
+    """
+    Migration 003: Vision-Felder fuer Person + Unternehmen.
+    Neue Spalten: karriere_stationen, stimmung_cbh, persoenlichkeit_notizen,
+                  umsatz_gesamt_cbh, linkedin_url, linkedin_trigger_notiz,
+                  linkedin_trigger_datum (Person);
+                  sense_of_urgency, sense_of_opportunity, umsatz_mio,
+                  rentabilitaet_notiz, wachstum_notiz, news_json,
+                  produkt_empfehlung, produkt_empfehlung_sekundaer,
+                  eigentuemerstruktur, cbh_umsatz_gesamt (Unternehmen).
+    Idempotent via _migration_003_guard.
+    """
+    guard_exists = _table_exists(conn, "_migration_003_guard")
+    if guard_exists:
+        already = conn.execute(
+            "SELECT 1 FROM _migration_003_guard WHERE applied='003_vision_fields'"
+        ).fetchone()
+        if already:
+            return
+
+    # ── Person: neue Spalten ──────────────────────────────────────────────────
+    _person_cols = [
+        ("karriere_stationen",     "ALTER TABLE person ADD COLUMN karriere_stationen TEXT"),
+        ("stimmung_cbh",           "ALTER TABLE person ADD COLUMN stimmung_cbh TEXT "
+                                   "CHECK(stimmung_cbh IN ('sehr_positiv','positiv','neutral','skeptisch','negativ') OR stimmung_cbh IS NULL)"),
+        ("persoenlichkeit_notizen","ALTER TABLE person ADD COLUMN persoenlichkeit_notizen TEXT"),
+        ("umsatz_gesamt_cbh",      "ALTER TABLE person ADD COLUMN umsatz_gesamt_cbh REAL"),
+        ("linkedin_url",           "ALTER TABLE person ADD COLUMN linkedin_url TEXT"),
+        ("linkedin_trigger_notiz", "ALTER TABLE person ADD COLUMN linkedin_trigger_notiz TEXT"),
+        ("linkedin_trigger_datum", "ALTER TABLE person ADD COLUMN linkedin_trigger_datum TEXT"),
+    ]
+    for col_name, sql in _person_cols:
+        if not _column_exists(conn, "person", col_name):
+            conn.execute(sql)
+
+    # ── Unternehmen: neue Spalten ─────────────────────────────────────────────
+    _PRODUKT_ENUM = (
+        "CHECK(produkt_empfehlung IN ('race','blindspot','okr_training','pm_training',"
+        "'innovation_cell','visionsworkshop','empower_os','tm','other') OR produkt_empfehlung IS NULL)"
+    )
+    _PRODUKT2_ENUM = (
+        "CHECK(produkt_empfehlung_sekundaer IN ('race','blindspot','okr_training','pm_training',"
+        "'innovation_cell','visionsworkshop','empower_os','tm','other') OR produkt_empfehlung_sekundaer IS NULL)"
+    )
+    _unt_cols = [
+        ("sense_of_urgency",             "ALTER TABLE unternehmen ADD COLUMN sense_of_urgency TEXT"),
+        ("sense_of_opportunity",         "ALTER TABLE unternehmen ADD COLUMN sense_of_opportunity TEXT"),
+        ("umsatz_mio",                   "ALTER TABLE unternehmen ADD COLUMN umsatz_mio REAL"),
+        ("rentabilitaet_notiz",          "ALTER TABLE unternehmen ADD COLUMN rentabilitaet_notiz TEXT"),
+        ("wachstum_notiz",               "ALTER TABLE unternehmen ADD COLUMN wachstum_notiz TEXT"),
+        ("news_json",                    "ALTER TABLE unternehmen ADD COLUMN news_json TEXT"),
+        ("produkt_empfehlung",           f"ALTER TABLE unternehmen ADD COLUMN produkt_empfehlung TEXT {_PRODUKT_ENUM}"),
+        ("produkt_empfehlung_sekundaer", f"ALTER TABLE unternehmen ADD COLUMN produkt_empfehlung_sekundaer TEXT {_PRODUKT2_ENUM}"),
+        ("eigentuemerstruktur",          "ALTER TABLE unternehmen ADD COLUMN eigentuemerstruktur TEXT"),
+        ("cbh_umsatz_gesamt",            "ALTER TABLE unternehmen ADD COLUMN cbh_umsatz_gesamt REAL"),
+        ("hauptsitz",                    "ALTER TABLE unternehmen ADD COLUMN hauptsitz TEXT"),
+        ("muttergesellschaft",           "ALTER TABLE unternehmen ADD COLUMN muttergesellschaft TEXT"),
+    ]
+    for col_name, sql in _unt_cols:
+        if not _column_exists(conn, "unternehmen", col_name):
+            conn.execute(sql)
+
+    # ── touchpoint: details-Feld ──────────────────────────────────────────────
+    if not _column_exists(conn, "touchpoint", "details"):
+        conn.execute("ALTER TABLE touchpoint ADD COLUMN details TEXT")
+
+    # ── Guard setzen + idempotente Indizes ────────────────────────────────────
+    if _MIGRATION_004.exists():
+        conn.executescript(_MIGRATION_004.read_text(encoding="utf-8"))
+
+    conn.execute(
+        "INSERT OR IGNORE INTO _migration_003_guard (applied) VALUES ('003_vision_fields')"
+    )
+    conn.commit()
+
+
 def init_db() -> None:
     """
     Legt alle Tabellen an falls noch nicht vorhanden.
@@ -121,6 +199,7 @@ def init_db() -> None:
         conn.commit()
         _run_migration_002(conn)
         _run_migration_sprint2(conn)
+        _run_migration_vision(conn)
     finally:
         conn.close()
 

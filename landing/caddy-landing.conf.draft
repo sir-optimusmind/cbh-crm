@@ -1,0 +1,46 @@
+# Caddy-Block DRAFT für Konstantin
+# In /etc/caddy/Caddyfile einfügen (unter bestehendem hook.srv960331.hstgr.cloud Block)
+#
+# WICHTIG: Basic-Auth gilt bereits für /mission-ctrl/* (vom CRM-Staging-Block).
+# Falls noch kein Basic-Auth für /mission-ctrl/ existiert, hier hinzufügen.
+#
+# Route: https://hook.srv960331.hstgr.cloud/mission-ctrl/ → Port 8508
+#
+# Prüfen: Gibt es schon einen `handle /mission-ctrl/*` Block?
+# Wenn ja → neuen handle DAVOR setzen (Caddy matcht zuerst).
+
+# Beispiel-Einfügung in den bestehenden hook.srv960331.hstgr.cloud Block:
+#
+# handle /mission-ctrl/ {
+#     basicauth {
+#         # gleiche Credentials wie CRM-Staging
+#         christian <bcrypt-hash>
+#     }
+#     reverse_proxy 127.0.0.1:8508
+# }
+#
+# handle /mission-ctrl/* {
+#     # Unterrouten vom Landing-Service (z.B. /mission-ctrl/health)
+#     reverse_proxy 127.0.0.1:8508
+# }
+#
+# ACHTUNG: /mission-ctrl/crm-staging/* muss weiterhin auf Port 8506 zeigen.
+# Sicherstellen, dass der CRM-Block NACH dem Landing-Block steht
+# oder via `path_regexp` sauber getrennt wird.
+#
+# Empfehlung Konstantin:
+# handle /mission-ctrl/crm-staging/* {
+#     reverse_proxy 127.0.0.1:8506
+# }
+# handle /mission-ctrl/ {
+#     basicauth { ... }
+#     reverse_proxy 127.0.0.1:8508
+# }
+# handle /mission-ctrl/health {
+#     reverse_proxy 127.0.0.1:8508
+# }
+
+# Nach Caddy-Änderung:
+#   sudo caddy validate --config /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+#   curl https://hook.srv960331.hstgr.cloud/mission-ctrl/ → HTTP 200 oder 401 (wenn BasicAuth aktiv)
