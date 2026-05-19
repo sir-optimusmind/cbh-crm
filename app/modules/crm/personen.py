@@ -41,7 +41,7 @@ def _validate_email(email: Optional[str]) -> Optional[str]:
 
 
 router = APIRouter()
-_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
+_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "templates")
 templates = Jinja2Templates(directory=_TEMPLATE_DIR)
 
 OWNERS = ["christian", "andre", "michi", "marco", "tim"]
@@ -115,6 +115,9 @@ def personen_liste(
     letzter_kontakt: str = "",
 ):
     prefix = request.scope.get("root_path", "")
+    # Derive short owner name from logged-in user (e.g. christian@cbh.ai -> christian)
+    raw_user = get_user(request)
+    current_user_owner = raw_user.split("@")[0] if "@" in raw_user else raw_user
     conn = get_connection()
     try:
         sql = "SELECT p.* FROM person p WHERE p.deleted_at IS NULL"
@@ -122,9 +125,11 @@ def personen_liste(
         if q:
             sql += " AND (p.vorname || ' ' || p.nachname LIKE ? OR p.email LIKE ?)"
             params += [f"%{q}%", f"%{q}%"]
-        if owner:
+        # owner=__me__ resolves to the logged-in user's short name
+        effective_owner = current_user_owner if owner == "__me__" else owner
+        if effective_owner:
             sql += " AND p.created_by = ?"
-            params.append(owner)
+            params.append(effective_owner)
         if stimmung:
             sql += " AND p.stimmung = ?"
             params.append(stimmung)
@@ -142,6 +147,7 @@ def personen_liste(
         "personen": personen,
         "q": q,
         "owner_filter": owner,
+        "current_user_owner": current_user_owner,
         "owners": OWNERS,
         "stimmungen": STIMMUNGEN,
         "stimmung_filter": stimmung,

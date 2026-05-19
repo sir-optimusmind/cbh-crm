@@ -7,21 +7,38 @@
   <a href="{{ prefix }}/personen/neu" class="btn-primary">+ Person anlegen</a>
 </div>
 
+
+<!-- Owner Pill-Bar (CRM-031) -->
+<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+  {%- set _q = q or '' -%}
+  {%- set _s = stimmung_filter or '' -%}
+  {%- set _lk = letzter_kontakt_filter or '' -%}
+  {%- macro owner_url(o) -%}{{ prefix }}/personen?q={{ _q }}&stimmung={{ _s }}&letzter_kontakt={{ _lk }}&owner={{ o }}{%- endmacro -%}
+  <a href="{{ owner_url('') }}"
+     style="display:inline-block; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600; text-decoration:none; border:2px solid transparent;
+            {% if not owner_filter %}border-bottom-color:#FFFB76; color:#FFFB76; background:rgba(255,251,118,0.08);{% else %}color:#aaa; background:rgba(255,255,255,0.04);{% endif %}">
+    Alle
+  </a>
+  <a href="{{ owner_url('__me__') }}"
+     style="display:inline-block; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600; text-decoration:none; border:2px solid transparent;
+            {% if owner_filter == '__me__' %}border-bottom-color:#FFFB76; color:#FFFB76; background:rgba(255,251,118,0.08);{% else %}color:#aaa; background:rgba(255,255,255,0.04);{% endif %}">
+    Meine
+  </a>
+  {% for o in owners %}
+  <a href="{{ owner_url(o) }}"
+     style="display:inline-block; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600; text-decoration:none; border:2px solid transparent; text-transform:capitalize;
+            {% if owner_filter == o %}border-bottom-color:#FFFB76; color:#FFFB76; background:rgba(255,251,118,0.08);{% else %}color:#aaa; background:rgba(255,255,255,0.04);{% endif %}">
+    {{ o | capitalize }}
+  </a>
+  {% endfor %}
+</div>
+
 <!-- Such-/Filterleiste -->
 <div class="card" style="margin-bottom:16px; padding:14px 20px;">
   <form method="get" action="{{ prefix }}/personen" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
     <div style="flex:1; min-width:180px;">
       <label>Suche (Name / E-Mail)</label>
       <input type="text" name="q" value="{{ q or '' }}" placeholder="Max Mustermann oder max@firma.de">
-    </div>
-    <div style="min-width:130px;">
-      <label>Owner</label>
-      <select name="owner">
-        <option value="">Alle</option>
-        {% for o in owners %}
-        <option value="{{ o }}" {% if owner_filter == o %}selected{% endif %}>{{ o }}</option>
-        {% endfor %}
-      </select>
     </div>
     <div style="min-width:120px;">
       <label>Stimmung</label>
