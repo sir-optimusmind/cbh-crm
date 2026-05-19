@@ -52,11 +52,22 @@ _BREADCRUMB_MAP = {
 
 def _resolve_active(path: str) -> str:
     """Longest-Prefix-Match: /crm-staging/personen/123 → 'crm'"""
+    # K-BUG-001: Extra-Prefixes fuer Routes die nicht unter dem NAV_ITEMS-Pfad liegen
+    EXTRA_PREFIXES = {
+        "pipeline": ["/deals"],
+        "crm":      ["/unternehmen", "/touchpoints"],
+    }
     best = "home"
     best_len = 0
     for item in NAV_ITEMS:
         if path.startswith(item["path"]) and len(item["path"]) > best_len:
             best, best_len = item["key"], len(item["path"])
+    # Extra-Prefix-Check: laengster Match gewinnt
+    for nav_key, prefixes in EXTRA_PREFIXES.items():
+        for prefix in prefixes:
+            full_prefix = f"{APP_PREFIX}{prefix}"
+            if path.startswith(full_prefix) and len(full_prefix) > best_len:
+                best, best_len = nav_key, len(full_prefix)
     # Fallback fuer Settings-Route
     if path.endswith("/settings") or "/settings" in path:
         return "settings"
