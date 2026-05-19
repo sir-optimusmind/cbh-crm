@@ -1,0 +1,70 @@
+{# templates/_kpi_summary.html – HTMX-Partial fuer KPI-Block auf Home-Dashboard #}
+{# Context: kpi_data (dict aus /api/kpis/summary) #}
+
+{% set tools_config = [
+  ('coldcall', '📞', 'Cold Calling',  'calls_today',         'Anrufe heute',
+                                       'appointments_today',   'Termine'),
+  ('crm',      '👥', 'CRM',           'persons_total',        'Personen',
+                                       'hot_contacts',         'Hot'),
+  ('pipeline', '🎯', 'Pipeline',      'open_deals',           'Deals offen',
+                                       'pipeline_volume_eur',  'Pipeline €'),
+  ('projects', '📁', 'Projekte',      'active',               'Aktive',
+                                       'avg_invoice_pct',      'Ø RG %'),
+] %}
+
+<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+  {% for tool_key, icon, label, kpi1_key, kpi1_label, kpi2_key, kpi2_label in tools_config %}
+  {% set t = kpi_data.get('tools', {}).get(tool_key, {}) %}
+  <div class="kpi-card" {% if t.get('stale') %}style="opacity: 0.7;"{% endif %}>
+    <div style="font-size: 11px; font-weight: 700; color: var(--text-muted);
+                text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
+                display: flex; align-items: center; gap: 4px;">
+      {{ icon }} {{ label }}
+      {% if t.get('stale') %}
+      <span title="Letzter bekannter Wert" style="color: var(--status-warning); font-size: 9px; margin-left: 4px;">●</span>
+      {% endif %}
+    </div>
+    <div style="display: flex; gap: 16px;">
+      <div>
+        <div style="font-size: 22px; font-weight: 900; color: var(--kpi-number); line-height: 1.1;">
+          {{ t.get(kpi1_key, '–') }}
+        </div>
+        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">{{ kpi1_label }}</div>
+      </div>
+      <div>
+        <div style="font-size: 22px; font-weight: 900; color: var(--accent-yellow); line-height: 1.1;">
+          {% if kpi2_key == 'pipeline_volume_eur' and t.get(kpi2_key) %}
+            {{ '{:,.0f}'.format(t.get(kpi2_key, 0)).replace(',', '.') }} €
+          {% elif kpi2_key == 'avg_invoice_pct' and t.get(kpi2_key) is not none %}
+            {{ t.get(kpi2_key, '–') }} %
+          {% else %}
+            {{ t.get(kpi2_key, '–') }}
+          {% endif %}
+        </div>
+        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">{{ kpi2_label }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{# KPI-Werte in Tile-Footern aktualisieren (IDs aus home.html) #}
+<script>
+(function() {
+  {% set t = kpi_data.get('tools', {}) %}
+  var kpis = {
+    'kpi-coldcall-calls':        '{{ t.get("coldcall", {}).get("calls_today", "–") }} Anrufe',
+    'kpi-coldcall-appointments': '{{ t.get("coldcall", {}).get("appointments_today", "–") }} Termine',
+    'kpi-crm-persons':           '{{ t.get("crm", {}).get("persons_total", "–") }} Personen',
+    'kpi-crm-hot':               '{{ t.get("crm", {}).get("hot_contacts", "–") }} Hot',
+    'kpi-pipeline-deals':        '{{ t.get("pipeline", {}).get("open_deals", "–") }} Deals offen',
+    'kpi-pipeline-volume':       '{{ t.get("pipeline", {}).get("pipeline_volume_eur", "–") }} €',
+    'kpi-projects-active':       '{{ t.get("projects", {}).get("active", "–") }} Aktive',
+    'kpi-projects-invoice':      '{{ t.get("projects", {}).get("avg_invoice_pct", "–") }} % RG',
+  };
+  Object.keys(kpis).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = kpis[id];
+  });
+})();
+</script>

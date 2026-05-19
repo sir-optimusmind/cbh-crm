@@ -132,3 +132,28 @@ async def home_dashboard(request: Request):
 @app.get("/settings")
 async def settings(request: Request):
     return render(request, "settings.html")
+
+
+# ─── KPI-Summary-Endpoint (Sprint 3 Wave 2: CRM-046) ─────────────────────────
+from app.shared.kpis import get_kpi_summary as _get_kpi_summary
+from app.shared.templating import templates as _templates
+
+@app.get("/api/kpis/summary")
+async def kpis_summary(request: Request):
+    """
+    GET /api/kpis/summary – Aggregierte KPIs fuer Home-Dashboard.
+    In-Memory TTL-Cache 60s. Stale-Fallback bei Fehler.
+    Kann als JSON oder als HTMX-Partial gerendert werden.
+    """
+    kpi_data = _get_kpi_summary()
+
+    # HTMX-Request: HTML-Partial zurueckgeben
+    accept = request.headers.get("accept", "")
+    hx_request = request.headers.get("hx-request", "")
+
+    if hx_request:
+        from fastapi.responses import HTMLResponse
+        from app.shared.templating import render
+        return render(request, "_kpi_summary.html", kpi_data=kpi_data)
+
+    return JSONResponse(kpi_data)
