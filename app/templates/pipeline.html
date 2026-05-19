@@ -58,7 +58,7 @@
       <div class="deal-card"
         data-id="{{ deal.id }}"
         data-stage="{{ deal.stage }}"
-        {% if stage not in ('won', 'lost') %}data-draggable="true"{% endif %}
+        data-draggable="true"
         id="card-{{ deal.id }}">
 
         <!-- Unternehmen (primär, fett) -->
@@ -127,61 +127,237 @@
 {% endblock %}
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+
+<!-- Lost-Modal (CRM-030): Verlustgrund bei Drag auf Lost-Spalte -->
+<dialog id="lost-modal"
+  style="margin:0; position:fixed; top:25vh; left:50%; transform:translateX(-50%);
+         width:480px; max-width:calc(100vw - 32px);
+         background:#1E1E1E; border:1px solid #333; border-radius:12px;
+         box-shadow:0 24px 64px rgba(0,0,0,0.65); padding:0; color:#F0F0F0;">
+  <form id="lost-form" method="dialog" style="display:flex; flex-direction:column;">
+    <!-- Header -->
+    <div style="padding:16px 20px; border-bottom:1px solid #2a2a2a; display:flex; align-items:center; justify-content:space-between;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:10px; height:10px; border-radius:50%; background:#DC2626;"></div>
+        <span style="font-size:15px; font-weight:700;">Deal als Lost markieren</span>
+      </div>
+      <button type="button" id="lost-cancel-x"
+        style="background:none; border:none; color:#666; font-size:18px; cursor:pointer; padding:0 4px; line-height:1;">&times;</button>
+    </div>
+    <!-- Body -->
+    <div style="padding:20px;">
+      <label style="display:block; font-size:12px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px;">
+        Verlustgrund <span style="color:#DC2626;">*</span>
+      </label>
+      <textarea id="lost-verlust-grund" name="verlust_grund" rows="3" required
+        placeholder="Min. 10 Zeichen – z.B. Preis, Wettbewerber, Timing, kein Budget..."
+        style="width:100%; box-sizing:border-box; background:#252525; border:1px solid #333; border-radius:6px;
+               color:#F0F0F0; font-family:'Barlow',sans-serif; font-size:13px; padding:8px 10px;
+               resize:vertical; outline:none;"></textarea>
+      <div id="lost-grund-error" style="display:none; color:#FCA5A5; font-size:12px; margin-top:4px;"></div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;">
+        <div>
+          <label style="display:block; font-size:11px; font-weight:700; color:#666; text-transform:uppercase; margin-bottom:4px;">
+            Wettbewerber (optional)
+          </label>
+          <input type="text" id="lost-competitor" name="lost_competitor"
+            placeholder="z.B. Accenture, intern..."
+            style="width:100%; box-sizing:border-box; background:#252525; border:1px solid #333; border-radius:6px;
+                   color:#F0F0F0; font-family:'Barlow',sans-serif; font-size:13px; padding:6px 10px; outline:none;">
+        </div>
+        <div>
+          <label style="display:block; font-size:11px; font-weight:700; color:#666; text-transform:uppercase; margin-bottom:4px;">
+            Retry-Datum (optional)
+          </label>
+          <input type="date" id="lost-retry-datum" name="retry_datum"
+            style="width:100%; box-sizing:border-box; background:#252525; border:1px solid #333; border-radius:6px;
+                   color:#F0F0F0; font-family:'Barlow',sans-serif; font-size:13px; padding:6px 10px; outline:none;">
+        </div>
+      </div>
+    </div>
+    <!-- Footer -->
+    <div style="padding:12px 20px; border-top:1px solid #2a2a2a; display:flex; justify-content:flex-end; gap:8px;">
+      <button type="button" id="lost-cancel-btn"
+        style="padding:8px 16px; background:#252525; border:1px solid #333; border-radius:6px;
+               color:#aaa; font-family:'Barlow',sans-serif; font-size:13px; font-weight:600; cursor:pointer;">
+        Abbrechen
+      </button>
+      <button type="submit" id="lost-submit-btn"
+        style="padding:8px 16px; background:#DC2626; border:none; border-radius:6px;
+               color:#fff; font-family:'Barlow',sans-serif; font-size:13px; font-weight:700; cursor:pointer;">
+        Als Lost markieren
+      </button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 const PREFIX = "{{ prefix }}";
 
-// SortableJS fuer alle Spalten ausser Won/Lost
+// State fuer laufenden Lost-Drop
+var _lostDealId = null;
+var _lostCard = null;
+var _lostFromCol = null;
+var _lostOldIndex = null;
+
+// ── Sortable fuer alle aktiven Spalten (Quelle + Drop fuer regulaere Stages)
 document.querySelectorAll('.kanban-col').forEach(function(col) {
-  const stage = col.dataset.stage;
-  if (stage === 'won' || stage === 'lost') return;
+  var stage = col.dataset.stage;
+  var isTerminal = (stage === 'won' || stage === 'lost');
 
   new Sortable(col, {
-    group: 'pipeline',
+    group: {
+      name: 'pipeline',
+      pull: isTerminal ? false : true,   // Terminal-Cols geben keine Karten raus
+      put: true                           // ALLE Cols nehmen Karten an
+    },
     animation: 150,
     ghostClass: 'sortable-ghost',
     draggable: '[data-draggable="true"]',
     onEnd: function(evt) {
-      const card = evt.item;
-      const dealId = card.dataset.id;
-      const newStage = evt.to.dataset.stage;
-      const oldStage = evt.from.dataset.stage;
+      var card = evt.item;
+      var dealId = card.dataset.id;
+      var newStage = evt.to.dataset.stage;
+      var oldStage = evt.from.dataset.stage;
 
       if (newStage === oldStage) return;
-      if (newStage === 'won' || newStage === 'lost') {
-        // Won/Lost per Drag nicht erlaubt – zurückschieben
+
+      if (newStage === 'won') {
+        // Karte zurueck (visuell) – Redirect zur Projekt-Anlage-Form
         evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);
-        showCardError(card, 'Won/Lost nur über Edit-Formular möglich');
+        // Won: Stage wird durch Projekt-Form gesetzt (CRM-015)
+        window.location.href = PREFIX + '/deals/' + dealId + '/create-project';
         return;
       }
 
-      // PATCH stage
-      fetch(PREFIX + '/deals/' + dealId + '/stage', {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({stage: newStage})
-      })
-      .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
-      .then(function(res) {
-        if (res.status !== 200 || res.data.error) {
-          // Zurückschieben
-          evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);
-          showCardError(card, res.data.error || 'Fehler beim Stage-Wechsel');
-        } else if (res.data.redirect) {
-          window.location.href = res.data.redirect;
-        } else {
-          card.dataset.stage = newStage;
-          clearCardError(card);
-          // Header aktualisieren (Counts) – einfacher Page-Refresh
-          setTimeout(function() { window.location.reload(); }, 800);
-        }
-      })
-      .catch(function(e) {
+      if (newStage === 'lost') {
+        // Karte zurueck (visuell) – Modal oeffnen
         evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);
-        showCardError(card, 'Netzwerkfehler');
-      });
+        openLostModal(dealId, card, evt.from, evt.oldIndex);
+        return;
+      }
+
+      // Regulaerer Stage-Wechsel (Drag zwischen aktiven Spalten)
+      patchStage(dealId, newStage, card, evt.from, evt.oldIndex, null);
     }
   });
 });
+
+// ── Lost-Modal Logik
+function openLostModal(dealId, card, fromCol, oldIndex) {
+  _lostDealId = dealId;
+  _lostCard = card;
+  _lostFromCol = fromCol;
+  _lostOldIndex = oldIndex;
+
+  // Felder zuruecksetzen
+  document.getElementById('lost-verlust-grund').value = '';
+  document.getElementById('lost-competitor').value = '';
+  document.getElementById('lost-retry-datum').value = '';
+  document.getElementById('lost-grund-error').style.display = 'none';
+  document.getElementById('lost-submit-btn').disabled = false;
+
+  document.getElementById('lost-modal').showModal();
+}
+
+function closeLostModal(revert) {
+  document.getElementById('lost-modal').close();
+  if (revert && _lostCard && _lostFromCol) {
+    // Karte springt zurueck – sie ist bereits im fromCol, nichts nötig
+  }
+  _lostDealId = null;
+  _lostCard = null;
+  _lostFromCol = null;
+  _lostOldIndex = null;
+}
+
+document.getElementById('lost-cancel-btn').addEventListener('click', function() {
+  closeLostModal(true);
+});
+document.getElementById('lost-cancel-x').addEventListener('click', function() {
+  closeLostModal(true);
+});
+// ESC schliesst Modal ohne Aktion
+document.getElementById('lost-modal').addEventListener('cancel', function(e) {
+  e.preventDefault();
+  closeLostModal(true);
+});
+
+document.getElementById('lost-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var grund = document.getElementById('lost-verlust-grund').value.trim();
+  var errEl = document.getElementById('lost-grund-error');
+
+  if (!grund || grund.length < 10) {
+    errEl.textContent = 'Bitte mindestens 10 Zeichen eingeben.';
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  var competitor = document.getElementById('lost-competitor').value.trim() || null;
+  var retryDatum = document.getElementById('lost-retry-datum').value || null;
+  var submitBtn = document.getElementById('lost-submit-btn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Speichern...';
+
+  var body = {stage: 'lost', verlust_grund: grund};
+  if (competitor) body.lost_competitor = competitor;
+  if (retryDatum) body.retry_datum = retryDatum;
+
+  fetch(PREFIX + '/deals/' + _lostDealId + '/stage', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  })
+  .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
+  .then(function(res) {
+    if (res.status !== 200 || res.data.error) {
+      document.getElementById('lost-grund-error').textContent = res.data.error || 'Fehler beim Speichern.';
+      document.getElementById('lost-grund-error').style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Als Lost markieren';
+    } else {
+      closeLostModal(false);
+      window.location.reload();
+    }
+  })
+  .catch(function() {
+    document.getElementById('lost-grund-error').textContent = 'Netzwerkfehler. Bitte erneut versuchen.';
+    document.getElementById('lost-grund-error').style.display = 'block';
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Als Lost markieren';
+  });
+});
+
+// ── Regulaerer Stage-Wechsel
+function patchStage(dealId, newStage, card, fromCol, oldIndex, extraBody) {
+  var body = Object.assign({stage: newStage}, extraBody || {});
+  fetch(PREFIX + '/deals/' + dealId + '/stage', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  })
+  .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
+  .then(function(res) {
+    if (res.status !== 200 || res.data.error) {
+      fromCol.insertBefore(card, fromCol.children[oldIndex] || null);
+      showCardError(card, res.data.error || 'Fehler beim Stage-Wechsel');
+    } else if (res.data.redirect) {
+      window.location.href = res.data.redirect;
+    } else {
+      card.dataset.stage = newStage;
+      clearCardError(card);
+      setTimeout(function() { window.location.reload(); }, 800);
+    }
+  })
+  .catch(function() {
+    fromCol.insertBefore(card, fromCol.children[oldIndex] || null);
+    showCardError(card, 'Netzwerkfehler');
+  });
+}
 
 function showCardError(card, msg) {
   var errEl = card.querySelector('.card-error');

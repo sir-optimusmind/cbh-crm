@@ -563,13 +563,16 @@ async def deal_delete_post(request: Request, deal_id: int):
 
 @router.patch("/deals/{deal_id}/stage")
 async def deal_stage_patch(request: Request, deal_id: int):
-    """Stage-Wechsel fuer Kanban Drag&Drop. Body: JSON {"stage": "discovery"}"""
+    """Stage-Wechsel fuer Kanban Drag&Drop.
+    Body: JSON {"stage": "discovery"} oder {"stage": "lost", "verlust_grund": "..."}"""
     prefix = request.scope.get("root_path", "")
     user = get_user(request)
     ip = get_client_ip(request)
 
     body = await request.json()
     new_stage = body.get("stage", "")
+    # CRM-030: verlust_grund aus Body wenn stage=lost (Drag&Drop Modal)
+    verlust_grund_body = body.get("verlust_grund", None)
 
     if new_stage not in STAGES:
         return JSONResponse({"error": f"Ungültige Stage: {new_stage}"}, status_code=422)
@@ -591,20 +594,30 @@ async def deal_stage_patch(request: Request, deal_id: int):
                 status_code=422
             )
 
+        # Verlust-Grund: aus Body (Modal) oder bestehender DB-Wert
+        effective_verlust_grund = verlust_grund_body if verlust_grund_body else deal["verlust_grund"]
+
         # Backup-Owner-Validierung fuer neue Stage
         err = _validate_deal(
             new_stage, deal["owner"], deal["backup_owner"],
             deal["followup_datum"], deal["unterschrift_datum"],
-            deal["projekt_start_datum"], deal["verlust_grund"]
+            deal["projekt_start_datum"], effective_verlust_grund
         )
         if err:
             return JSONResponse({"error": err}, status_code=422)
 
         ts = now_iso()
-        conn.execute(
-            "UPDATE deal SET stage=?, updated_at=? WHERE id=?",
-            (new_stage, ts, deal_id)
-        )
+        if new_stage == "lost" and verlust_grund_body:
+            # CRM-030: verlust_grund direkt mit Stage-Wechsel persistieren
+            conn.execute(
+                "UPDATE deal SET stage=?, verlust_grund=?, updated_at=? WHERE id=?",
+                (new_stage, effective_verlust_grund, ts, deal_id)
+            )
+        else:
+            conn.execute(
+                "UPDATE deal SET stage=?, updated_at=? WHERE id=?",
+                (new_stage, ts, deal_id)
+            )
         write_audit_log(conn, user=user, entity_type="deal", entity_id=deal_id,
                         action="UPDATE",
                         changed_fields={"stage": {"from": old_stage, "to": new_stage}},
