@@ -79,15 +79,18 @@ async def pipeline_kanban(request: Request):
             }
 
         # CVR zur naechsten Stage berechnen
-        # Formel: COUNT(stage n+1) / COUNT(stage n)
+        # Formel: COUNT(stage n+1) / COUNT(stage n) * 100, max 100%
+        # [TECH-DEBT] Snapshot-Naehrung, nicht historischer Flow. Gilt solange kein Stage-History-Log existiert.
         active_stages = ["opportunity", "new", "discovery", "proposal_sent"]
         for i, stage in enumerate(active_stages):
             next_stage = active_stages[i + 1] if i + 1 < len(active_stages) else "won"
             curr_count = stages_data[stage]["count"]
             next_count = stages_data[next_stage]["count"]
-            stages_data[stage]["cvr"] = (
-                round(next_count / curr_count * 100, 0) if curr_count > 0 else 0
-            )
+            if curr_count > 0:
+                raw_cvr = round(next_count / curr_count * 100, 0)
+                stages_data[stage]["cvr"] = min(raw_cvr, 100)
+            else:
+                stages_data[stage]["cvr"] = 0
 
         # Won: kein CVR, stattdessen YTD-Volumen
         stages_data["won"]["cvr"] = None

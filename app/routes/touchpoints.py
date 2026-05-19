@@ -92,6 +92,48 @@ async def touchpoint_create(
         return RedirectResponse(url=f"{prefix}/deals/{deal_id}", status_code=303)
 
 
+# ─── DELETE: Touchpoint Soft-Delete ──────────────────────────────────────────
+
+@router.delete("/touchpoints/{touchpoint_id}")
+async def touchpoint_delete(request: Request, touchpoint_id: int):
+    """Soft-Delete eines Touchpoints. Kein UI-Button in Sprint 2 – nur Backend-Endpoint."""
+    user = get_user(request)
+    ip = get_client_ip(request)
+
+    conn = get_connection()
+    try:
+        existing = conn.execute(
+            "SELECT id, person_id, deal_id FROM touchpoint WHERE id=? AND deleted_at IS NULL",
+            (touchpoint_id,)
+        ).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Touchpoint nicht gefunden")
+
+        ts = now_iso()
+        conn.execute(
+            "UPDATE touchpoint SET deleted_at=? WHERE id=?",
+            (ts, touchpoint_id)
+        )
+        write_audit_log(conn, user=user, entity_type="touchpoint", entity_id=touchpoint_id,
+                        action="DELETE", changed_fields={"deleted": True}, ip_address=ip)
+        conn.commit()
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+    return JSONResponse({"ok": True, "deleted": touchpoint_id}, status_code=200)
+
+
+@router.post("/touchpoints/{touchpoint_id}/delete")
+async def touchpoint_delete_post(request: Request, touchpoint_id: int):
+    """POST-Override fuer Soft-Delete (Browser-Forms koennen kein DELETE senden)."""
+    return await touchpoint_delete(request, touchpoint_id)
+
+
 # ─── GET: Touchpoints fuer Person (HTMX-Fragment) ────────────────────────────
 
 @router.get("/personen/{person_id}/touchpoints", response_class=HTMLResponse)

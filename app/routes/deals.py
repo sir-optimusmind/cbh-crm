@@ -31,7 +31,7 @@ templates = Jinja2Templates(directory=_TEMPLATE_DIR)
 # ─── Konstanten ───────────────────────────────────────────────────────────────
 OWNERS = ["christian", "andre", "michi", "marco", "tim"]
 STAGES = ["new", "opportunity", "discovery", "proposal_sent", "won", "lost"]
-STAGES_REQUIRING_BACKUP = ["opportunity", "discovery", "proposal_sent", "won", "lost"]
+STAGES_REQUIRING_BACKUP = ["new", "opportunity", "discovery", "proposal_sent", "won", "lost"]
 PRODUCTS = ["race", "blindspot", "okr_training", "pm_training", "innovation_cell", "visionsworkshop", "empower_os", "tm", "other"]
 LEAD_SOURCES = ["linkedin", "email", "telefon", "lemlist", "cognism", "apollo", "networking", "referral", "other"]
 LEAD_TYPES = ["unknown_unknown", "lucky_deal", "inbound"]
@@ -78,8 +78,11 @@ def _validate_deal(
             return "Unterschriftsdatum ist Pflichtfeld bei Stage Won"
         if not projekt_start_datum:
             return "Projektstartdatum ist Pflichtfeld bei Stage Won"
-    if stage == "lost" and not verlust_grund:
-        return "Verlustgrund ist Pflichtfeld bei Stage Lost"
+    if stage == "lost":
+        if not verlust_grund:
+            return "Verlustgrund ist Pflichtfeld bei Stage Lost"
+        if len(verlust_grund) < 10:
+            return "Verlustgrund muss mindestens 10 Zeichen lang sein"
 
     return None
 
@@ -541,6 +544,14 @@ async def deal_delete(request: Request, deal_id: int):
         conn.close()
 
     return JSONResponse({"redirect": f"{prefix}/deals"}, status_code=200)
+
+
+# ─── CRM-010: Deal löschen (POST-Override für HTMX/Browser-Forms) ───────────
+
+@router.post("/deals/{deal_id}/delete")
+async def deal_delete_post(request: Request, deal_id: int):
+    """POST-Override fuer Soft-Delete (Browser-Forms koennen kein DELETE senden)."""
+    return await deal_delete(request, deal_id)
 
 
 # ─── CRM-011: Stage-Wechsel via PATCH (Kanban Drag&Drop) ─────────────────────
