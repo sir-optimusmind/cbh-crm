@@ -82,11 +82,27 @@
       <span style="font-weight:600; font-size:13px; letter-spacing:0.08em; text-transform:uppercase; color:#aaa;">CRM</span>
     </div>
     <nav style="display:flex; align-items:center; gap:20px;">
-      <a href="{{ prefix }}/pipeline" style="color:#FFFB76; text-decoration:none; font-size:13px; font-weight:700;" title="Pipeline-Kanban">Pipeline</a>
-      <a href="{{ prefix }}/deals" style="color:#aaa; text-decoration:none; font-size:13px; font-weight:600;" onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'">Deals</a>
-      <a href="{{ prefix }}/personen" style="color:#aaa; text-decoration:none; font-size:13px; font-weight:600;" onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'">Personen</a>
-      <a href="{{ prefix }}/unternehmen" style="color:#aaa; text-decoration:none; font-size:13px; font-weight:600;" onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'">Unternehmen</a>
-      <a href="{{ prefix }}/projects" style="color:#aaa; text-decoration:none; font-size:13px; font-weight:600;" onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'">Projekte</a>
+      {# Active-State: request.url.path gegen prefix-bereinigte Pfade prüfen. #}
+      {# Pipeline-Gruppe: /pipeline, /deals #}
+      {# CRM-Gruppe: /personen, /unternehmen, /touchpoints #}
+      {# Projekte-Gruppe: /projects, /projekte #}
+      {% set path = request.url.path %}
+      <a href="{{ prefix }}/pipeline"
+         style="color:{% if path.startswith(prefix + '/pipeline') or path.startswith(prefix + '/deals') %}#FFFB76{% else %}#aaa{% endif %}; text-decoration:none; font-size:13px; font-weight:{% if path.startswith(prefix + '/pipeline') or path.startswith(prefix + '/deals') %}700{% else %}600{% endif %};"
+         {% if not (path.startswith(prefix + '/pipeline') or path.startswith(prefix + '/deals')) %}onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'"{% endif %}
+         title="Pipeline-Kanban">Pipeline</a>
+      <a href="{{ prefix }}/deals"
+         style="color:{% if path.startswith(prefix + '/deals') %}#FFFB76{% else %}#aaa{% endif %}; text-decoration:none; font-size:13px; font-weight:{% if path.startswith(prefix + '/deals') %}700{% else %}600{% endif %};"
+         {% if not path.startswith(prefix + '/deals') %}onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'"{% endif %}>Deals</a>
+      <a href="{{ prefix }}/personen"
+         style="color:{% if path.startswith(prefix + '/personen') or path.startswith(prefix + '/unternehmen') or path.startswith(prefix + '/touchpoints') %}#FFFB76{% else %}#aaa{% endif %}; text-decoration:none; font-size:13px; font-weight:{% if path.startswith(prefix + '/personen') or path.startswith(prefix + '/unternehmen') or path.startswith(prefix + '/touchpoints') %}700{% else %}600{% endif %};"
+         {% if not (path.startswith(prefix + '/personen') or path.startswith(prefix + '/unternehmen') or path.startswith(prefix + '/touchpoints')) %}onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'"{% endif %}>Personen</a>
+      <a href="{{ prefix }}/unternehmen"
+         style="color:{% if path.startswith(prefix + '/personen') or path.startswith(prefix + '/unternehmen') or path.startswith(prefix + '/touchpoints') %}#FFFB76{% else %}#aaa{% endif %}; text-decoration:none; font-size:13px; font-weight:{% if path.startswith(prefix + '/personen') or path.startswith(prefix + '/unternehmen') or path.startswith(prefix + '/touchpoints') %}700{% else %}600{% endif %};"
+         {% if not (path.startswith(prefix + '/personen') or path.startswith(prefix + '/unternehmen') or path.startswith(prefix + '/touchpoints')) %}onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'"{% endif %}>Unternehmen</a>
+      <a href="{{ prefix }}/projects"
+         style="color:{% if path.startswith(prefix + '/projects') or path.startswith(prefix + '/projekte') %}#FFFB76{% else %}#aaa{% endif %}; text-decoration:none; font-size:13px; font-weight:{% if path.startswith(prefix + '/projects') or path.startswith(prefix + '/projekte') %}700{% else %}600{% endif %};"
+         {% if not (path.startswith(prefix + '/projects') or path.startswith(prefix + '/projekte')) %}onmouseover="this.style.color='#F0F0F0'" onmouseout="this.style.color='#aaa'"{% endif %}>Projekte</a>
       <!-- User-Avatar + Logout -->
       {% if current_user %}
       <div style="display:flex; align-items:center; gap:8px; margin-left:8px; border-left:1px solid #333; padding-left:16px;">
