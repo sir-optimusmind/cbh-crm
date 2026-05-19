@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} bearbeiten – CBH CRM{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+  <a href="{{ prefix }}/projects/{{ project.id }}" class="btn-secondary btn-sm">← Projekt</a>
+</div>
+
+<h1 style="font-size:22px; font-weight:700; margin:0 0 20px 0;">Projekt bearbeiten</h1>
+
+<form hx-put="{{ prefix }}/projects/{{ project.id }}" hx-target="body" hx-swap="outerHTML" style="max-width:600px;">
+  <div class="card" style="margin-bottom:16px;">
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Basis</div>
+
+    <div class="form-group">
+      <label>Name *</label>
+      <input type="text" name="name" value="{{ project.name }}" required>
+    </div>
+
+    <div class="form-group">
+      <label>Delivery Owner *</label>
+      <select name="delivery_owner" required>
+        {% for o in owners %}
+        <option value="{{ o }}" {% if project.delivery_owner == o %}selected{% endif %}>{{ o|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Status</label>
+      <select name="status">
+        {% for s in statuses %}
+        <option value="{{ s }}" {% if project.status == s %}selected{% endif %}>{{ s|replace('_',' ')|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Startdatum</label>
+      <input type="date" name="start_date" value="{{ project.start_date or '' }}">
+    </div>
+
+    <div class="form-group">
+      <label>Geplantes Enddatum</label>
+      <input type="date" name="end_date_planned" value="{{ project.end_date_planned or '' }}">
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Finanzen</div>
+
+    <div class="form-group">
+      <label>Soll-Umsatz (€)</label>
+      <input type="number" name="contract_value" step="0.01" value="{{ project.contract_value or '' }}">
+    </div>
+
+    <div class="form-group">
+      <label>Ist-Rechnungen (€)</label>
+      <input type="number" name="ist_rechnungen" step="0.01" value="{{ project.ist_rechnungen or 0 }}">
+      <small style="color:#555; font-size:11px;">Rechnungsgrad wird automatisch berechnet</small>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Kontext</div>
+
+    <div class="form-group">
+      <label>Outcome-Definition</label>
+      <textarea name="outcome_definition" rows="3">{{ project.outcome_definition or '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Dokumentations-Link</label>
+      <input type="url" name="dok_link" value="{{ project.dok_link or '' }}" placeholder="https://drive.google.com/…">
+    </div>
+
+    <div class="form-group">
+      <label>Ausblick</label>
+      <textarea name="ausblick" rows="2">{{ project.ausblick or '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Notizen</label>
+      <textarea name="notes" rows="2">{{ project.notes or '' }}</textarea>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:12px;">
+    <button type="submit" class="btn-primary">Speichern</button>
+    <a href="{{ prefix }}/projects/{{ project.id }}" class="btn-secondary">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}

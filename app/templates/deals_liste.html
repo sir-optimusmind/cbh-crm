@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Deals – CBH CRM{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <h1 style="font-size:22px; font-weight:700; margin:0;">Deals</h1>
+  <div style="display:flex; gap:8px;">
+    <a href="{{ prefix }}/pipeline" class="btn-secondary btn-sm">Kanban-View</a>
+    <a href="{{ prefix }}/deals/new" class="btn-primary">+ Neuer Deal</a>
+  </div>
+</div>
+
+<!-- Filter -->
+<div class="card" style="margin-bottom:16px; padding:14px 20px;">
+  <form method="get" action="{{ prefix }}/deals" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+    <div>
+      <label>Stage</label>
+      <select name="stage" style="width:140px;">
+        <option value="">Alle</option>
+        {% for s in stages %}
+        <option value="{{ s }}" {% if filter_stage == s %}selected{% endif %}>{{ s|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Owner</label>
+      <select name="owner" style="width:120px;">
+        <option value="">Alle</option>
+        {% for o in owners %}
+        <option value="{{ o }}" {% if filter_owner == o %}selected{% endif %}>{{ o|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Produkt</label>
+      <select name="product" style="width:140px;">
+        <option value="">Alle</option>
+        {% for p in products %}
+        <option value="{{ p }}" {% if filter_product == p %}selected{% endif %}>{{ p|upper }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn-secondary btn-sm">Filtern</button>
+    <a href="{{ prefix }}/deals" class="btn-secondary btn-sm">Reset</a>
+  </form>
+</div>
+
+<!-- Tabelle -->
+<div class="card" style="padding:0; overflow:hidden;">
+  <table>
+    <thead>
+      <tr>
+        <th>Titel</th>
+        <th>Stage</th>
+        <th>Owner</th>
+        <th>Backup</th>
+        <th>Unternehmen / Person</th>
+        <th>Produkte</th>
+        <th>ACV</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if deals %}
+      {% for d in deals %}
+      <tr>
+        <td><a href="{{ prefix }}/deals/{{ d.id }}" style="color:#5870E2; text-decoration:none; font-weight:600;">{{ d.titel }}</a></td>
+        <td>
+          {% if d.stage == 'won' %}<span class="badge badge-green">won</span>
+          {% elif d.stage == 'lost' %}<span class="badge badge-red">lost</span>
+          {% elif d.stage == 'opportunity' %}<span class="badge badge-orange">opportunity</span>
+          {% elif d.stage == 'proposal_sent' %}<span class="badge badge-blue">proposal sent</span>
+          {% else %}<span class="badge" style="background:#2a2a2a; color:#aaa;">{{ d.stage }}</span>
+          {% endif %}
+        </td>
+        <td><span class="badge badge-yellow">{{ d.owner }}</span></td>
+        <td style="color:#777; font-size:12px;">{{ d.backup_owner or '–' }}</td>
+        <td style="font-size:13px;">
+          {% if d.unternehmen_name %}<strong>{{ d.unternehmen_name }}</strong>{% endif %}
+          {% if d.person_name %}<div style="color:#aaa; font-size:12px;">{{ d.person_name }}</div>{% endif %}
+          {% if not d.unternehmen_name and not d.person_name %}–{% endif %}
+        </td>
+        <td style="font-size:12px; color:#aaa;">
+          {% for p in d.products[:2] %}
+          <span class="badge" style="background:#2a2a2a; color:#FFFB76; margin-right:2px;">{{ p }}</span>
+          {% endfor %}
+          {% if d.products|length > 2 %}<span style="color:#666;">+{{ d.products|length - 2 }}</span>{% endif %}
+        </td>
+        <td style="font-weight:600; color:#FFFB76;">
+          {% if d.acv %}€{{ "{:,.0f}".format(d.acv) }}{% else %}–{% endif %}
+        </td>
+        <td>
+          <a href="{{ prefix }}/deals/{{ d.id }}/edit" class="btn-secondary btn-sm">Edit</a>
+        </td>
+      </tr>
+      {% endfor %}
+      {% else %}
+      <tr><td colspan="8" style="text-align:center; color:#555; padding:32px;">Keine Deals vorhanden. <a href="{{ prefix }}/deals/new" style="color:#5870E2;">Ersten Deal anlegen</a></td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

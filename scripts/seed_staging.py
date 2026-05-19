@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/cbh/crm/.venv/bin/python3
 """
 CRM-008: Seed-Script (erweitert für CRM-QW-02 + CRM-QW-03)
 Legt 10 Personen + 3 Firmen + Verknüpfungen an.

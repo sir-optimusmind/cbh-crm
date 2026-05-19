@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Pipeline – CBH CRM{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+  <h1 style="font-size:22px; font-weight:700; margin:0;">Pipeline-Kanban</h1>
+  <div style="display:flex; gap:8px;">
+    <a href="{{ prefix }}/pipeline/stages" class="btn-secondary btn-sm">Stage-Definitionen</a>
+    <a href="{{ prefix }}/deals/new" class="btn-primary btn-sm">+ Neuer Deal</a>
+  </div>
+</div>
+
+<!-- Kanban Board -->
+<div style="display:grid; grid-template-columns:repeat(6,1fr); gap:12px; overflow-x:auto; min-width:900px;">
+  {% set stage_labels = {
+    'opportunity': 'Opportunity',
+    'new': 'New',
+    'discovery': 'Discovery',
+    'proposal_sent': 'Proposal Sent',
+    'won': 'Won',
+    'lost': 'Lost'
+  } %}
+
+  {% for stage in stages %}
+  {% set sd = stages_data[stage] %}
+  <div style="min-width:160px;">
+    <!-- Spalten-Header -->
+    <div style="padding:10px 12px; background:#252525; border-radius:8px 8px 0 0; border-top: 3px solid
+      {% if stage == 'won' %}#34D399
+      {% elif stage == 'lost' %}#DC2626
+      {% elif stage == 'opportunity' %}#FB923C
+      {% elif stage == 'proposal_sent' %}#5870E2
+      {% else %}#555{% endif %}; margin-bottom:2px;">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#F0F0F0; margin-bottom:4px;">
+        {{ stage_labels[stage] }}
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#aaa;">
+        <span>{{ sd.count }} Deal{% if sd.count != 1 %}s{% endif %}</span>
+        {% if stage in ('won', 'lost') %}
+        <span style="color:#FFFB76; font-weight:700;">
+          {% if sd.acv_sum > 0 %}YTD: €{{ "{:,.0f}".format(sd.acv_sum) }}{% else %}€0{% endif %}
+        </span>
+        {% elif sd.acv_sum > 0 %}
+        <span>€{{ "{:,.0f}".format(sd.acv_sum) }}</span>
+        {% endif %}
+      </div>
+      {% if stage not in ('won', 'lost') and sd.cvr is not none %}
+      <div style="font-size:11px; color:#777; margin-top:2px;">CVR → {{ sd.cvr|int }}%</div>
+      {% endif %}
+    </div>
+
+    <!-- Deal-Karten -->
+    <div class="kanban-col"
+      data-stage="{{ stage }}"
+      id="col-{{ stage }}"
+      style="padding:6px 0; min-height:200px; background:#1a1a1a; border-radius:0 0 8px 8px; border:1px solid #2a2a2a; border-top:none; padding:8px;">
+
+      {% for deal in sd.deals %}
+      <div class="deal-card"
+        data-id="{{ deal.id }}"
+        data-stage="{{ deal.stage }}"
+        {% if stage not in ('won', 'lost') %}data-draggable="true"{% endif %}
+        id="card-{{ deal.id }}">
+
+        <!-- Unternehmen (primär, fett) -->
+        <div style="font-weight:700; font-size:13px; color:#F0F0F0; margin-bottom:2px; line-height:1.3;">
+          {% if deal.unternehmen_name %}{{ deal.unternehmen_name }}
+          {% elif deal.person_name %}{{ deal.person_name }}
+          {% else %}<span style="color:#666; font-style:italic;">–</span>{% endif %}
+        </div>
+
+        <!-- Person (kleiner darunter) -->
+        {% if deal.unternehmen_name and deal.person_name %}
+        <div style="font-size:11px; color:#777; margin-bottom:6px;">{{ deal.person_name }}</div>
+        {% endif %}
+
+        <!-- ACV + Produkte -->
+        {% if deal.acv or deal.products %}
+        <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-bottom:6px;">
+          {% if deal.acv %}
+          <span style="font-size:12px; font-weight:700; color:#FFFB76;">€{{ "{:,.0f}".format(deal.acv) }}</span>
+          {% endif %}
+          {% for p in deal.products[:2] %}
+          <span class="badge" style="background:rgba(255,251,118,0.1); color:#FFFB76; font-size:10px; padding:1px 5px;">{{ p|replace('_',' ')|upper }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Owner-Kürzel -->
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; gap:4px;">
+            <span style="font-size:10px; font-weight:700; color:#888; background:#2a2a2a; padding:2px 5px; border-radius:3px;">{{ deal.owner[:2]|upper }}</span>
+            {% if deal.backup_owner %}
+            <span style="font-size:10px; color:#555; background:#222; padding:2px 5px; border-radius:3px;" title="Backup: {{ deal.backup_owner }}">{{ deal.backup_owner[:2]|upper }}</span>
+            {% endif %}
+          </div>
+          {% if deal.lead_source %}
+          <span style="font-size:10px; color:#555;">{{ deal.lead_source }}</span>
+          {% endif %}
+        </div>
+
+        <!-- Follow-up-Datum bei Opportunity -->
+        {% if deal.stage == 'opportunity' and deal.followup_datum %}
+        <div style="margin-top:4px; font-size:11px; color:#FB923C;">↻ {{ deal.followup_datum }}</div>
+        {% endif %}
+
+        <div style="margin-top:6px;">
+          <a href="{{ prefix }}/deals/{{ deal.id }}" style="color:#5870E2; font-size:11px; text-decoration:none;">Details →</a>
+        </div>
+
+        <!-- Inline-Error (Drag&Drop Feedback) -->
+        <div class="card-error" style="display:none; color:#FCA5A5; font-size:11px; margin-top:6px;"></div>
+      </div>
+      {% endfor %}
+
+      {% if sd.count == 0 %}
+      <div style="color:#444; font-size:12px; text-align:center; padding:20px 8px; font-style:italic;">Keine Deals</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Stage-Def Link -->
+<div style="margin-top:16px; text-align:right;">
+  <a href="{{ prefix }}/pipeline/stages" style="color:#aaa; font-size:12px; text-decoration:none;">ℹ Stage-Definitionen ansehen</a>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+const PREFIX = "{{ prefix }}";
+
+// SortableJS fuer alle Spalten ausser Won/Lost
+document.querySelectorAll('.kanban-col').forEach(function(col) {
+  const stage = col.dataset.stage;
+  if (stage === 'won' || stage === 'lost') return;
+
+  new Sortable(col, {
+    group: 'pipeline',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    draggable: '[data-draggable="true"]',
+    onEnd: function(evt) {
+      const card = evt.item;
+      const dealId = card.dataset.id;
+      const newStage = evt.to.dataset.stage;
+      const oldStage = evt.from.dataset.stage;
+
+      if (newStage === oldStage) return;
+      if (newStage === 'won' || newStage === 'lost') {
+        // Won/Lost per Drag nicht erlaubt – zurückschieben
+        evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);
+        showCardError(card, 'Won/Lost nur über Edit-Formular möglich');
+        return;
+      }
+
+      // PATCH stage
+      fetch(PREFIX + '/deals/' + dealId + '/stage', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({stage: newStage})
+      })
+      .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
+      .then(function(res) {
+        if (res.status !== 200 || res.data.error) {
+          // Zurückschieben
+          evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);
+          showCardError(card, res.data.error || 'Fehler beim Stage-Wechsel');
+        } else if (res.data.redirect) {
+          window.location.href = res.data.redirect;
+        } else {
+          card.dataset.stage = newStage;
+          clearCardError(card);
+          // Header aktualisieren (Counts) – einfacher Page-Refresh
+          setTimeout(function() { window.location.reload(); }, 800);
+        }
+      })
+      .catch(function(e) {
+        evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);
+        showCardError(card, 'Netzwerkfehler');
+      });
+    }
+  });
+});
+
+function showCardError(card, msg) {
+  var errEl = card.querySelector('.card-error');
+  errEl.textContent = msg;
+  errEl.style.display = 'block';
+  card.classList.add('dragging-error');
+  setTimeout(function() {
+    errEl.style.display = 'none';
+    card.classList.remove('dragging-error');
+  }, 3000);
+}
+
+function clearCardError(card) {
+  var errEl = card.querySelector('.card-error');
+  errEl.style.display = 'none';
+  card.classList.remove('dragging-error');
+}
+</script>
+{% endblock %}

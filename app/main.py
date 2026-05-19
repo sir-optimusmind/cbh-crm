@@ -1,6 +1,6 @@
 """
 main.py – CBH MISSION CTRL CRM Module
-FastAPI App – Sprint 1
+FastAPI App – Sprint 1 + Sprint 2
 
 APP_PREFIX kommt aus .env (PFLICHT, nie hardcoden).
 """
@@ -16,6 +16,10 @@ from fastapi.templating import Jinja2Templates
 from app.db import init_db
 from app.routes.personen import router as personen_router
 from app.routes.unternehmen import router as unternehmen_router
+from app.routes.deals import router as deals_router
+from app.routes.touchpoints import router as touchpoints_router
+from app.routes.projects import router as projects_router
+from app.routes.pipeline import router as pipeline_router
 
 # ─── Konfiguration aus .env ───────────────────────────────────────────────────
 APP_PREFIX = os.getenv("APP_PREFIX", "/mission-ctrl/crm-staging").rstrip("/")
@@ -46,6 +50,10 @@ app = FastAPI(
 # Router einbinden
 app.include_router(personen_router)
 app.include_router(unternehmen_router)
+app.include_router(deals_router)
+app.include_router(touchpoints_router)
+app.include_router(projects_router)
+app.include_router(pipeline_router)
 
 
 # ─── Health-Check ─────────────────────────────────────────────────────────────

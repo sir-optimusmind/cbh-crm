@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Projekte – CBH CRM{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <h1 style="font-size:22px; font-weight:700; margin:0;">Projekte</h1>
+</div>
+
+<!-- Filter -->
+<div class="card" style="margin-bottom:16px; padding:14px 20px;">
+  <form method="get" action="{{ prefix }}/projects" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+    <div>
+      <label>Status</label>
+      <select name="status" style="width:140px;">
+        <option value="">Alle</option>
+        {% for s in statuses %}
+        <option value="{{ s }}" {% if filter_status == s %}selected{% endif %}>{{ s|replace('_',' ')|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn-secondary btn-sm">Filtern</button>
+    <a href="{{ prefix }}/projects" class="btn-secondary btn-sm">Reset</a>
+  </form>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <table>
+    <thead>
+      <tr>
+        <th>Projekt</th>
+        <th>Kunde</th>
+        <th>Status</th>
+        <th>Outcome-Def</th>
+        <th>Soll-Umsatz</th>
+        <th>Ist-Rechnungen</th>
+        <th>Rechnungsgrad</th>
+        <th>Ausblick</th>
+        <th>Dok</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if projects %}
+      {% for p in projects %}
+      <tr>
+        <td>
+          <a href="{{ prefix }}/projects/{{ p.id }}" style="color:#5870E2; text-decoration:none; font-weight:600;">{{ p.name }}</a>
+          <div style="font-size:11px; color:#555;">{{ p.delivery_owner }}</div>
+        </td>
+        <td style="font-size:13px;">{{ p.kunde_name or '–' }}</td>
+        <td>
+          {% if p.status == 'active' %}<span class="badge badge-green">active</span>
+          {% elif p.status == 'completed' %}<span class="badge badge-blue">completed</span>
+          {% elif p.status == 'on_hold' %}<span class="badge badge-orange">on hold</span>
+          {% else %}<span class="badge" style="background:#333; color:#777;">{{ p.status }}</span>
+          {% endif %}
+        </td>
+        <td style="font-size:12px; color:#aaa; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ p.outcome_definition or '' }}">{{ p.outcome_definition or '–' }}</td>
+        <td style="font-weight:600; color:#FFFB76;">
+          {% if p.contract_value %}€{{ "{:,.0f}".format(p.contract_value) }}{% else %}–{% endif %}
+        </td>
+        <td>{% if p.ist_rechnungen %}€{{ "{:,.0f}".format(p.ist_rechnungen) }}{% else %}€0{% endif %}</td>
+        <td style="min-width:100px;">
+          {% if p.rechnungsgrad is not none %}
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:12px; font-weight:700; color:{% if p.rechnungsgrad >= 80 %}#34D399{% elif p.rechnungsgrad >= 30 %}#FB923C{% else %}#aaa{% endif %};">{{ p.rechnungsgrad }}%</span>
+            <div class="progress-bar" style="width:60px;">
+              <div class="progress-bar-fill" style="width:{{ [p.rechnungsgrad, 100]|min }}%; background:{% if p.rechnungsgrad >= 80 %}#34D399{% elif p.rechnungsgrad >= 30 %}#FB923C{% else %}#555{% endif %};"></div>
+            </div>
+          </div>
+          {% else %}–{% endif %}
+        </td>
+        <td style="font-size:12px; color:#aaa; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ p.ausblick or '' }}">{{ p.ausblick or '–' }}</td>
+        <td>{% if p.dok_link %}<a href="{{ p.dok_link }}" target="_blank" style="color:#5870E2; font-size:12px;">→ Drive</a>{% else %}–{% endif %}</td>
+      </tr>
+      {% endfor %}
+      {% else %}
+      <tr><td colspan="9" style="text-align:center; color:#555; padding:32px;">Keine Projekte vorhanden. Projekte entstehen automatisch wenn ein Deal auf Won gesetzt wird.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% block title %}{% if deal %}Deal bearbeiten{% else %}Neuer Deal{% endif %} – CBH CRM{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+  <a href="{{ prefix }}/deals" class="btn-secondary btn-sm">← Deals</a>
+  <span style="font-size:13px; color:#aaa;">{% if deal %}{{ deal.titel }} bearbeiten{% else %}Neuer Deal{% endif %}</span>
+</div>
+
+<h1 style="font-size:22px; font-weight:700; margin:0 0 20px 0;">{% if deal %}Deal bearbeiten{% else %}Neuer Deal anlegen{% endif %}</h1>
+
+{% if flash_error %}
+<div class="flash-error">{{ flash_error }}</div>
+{% endif %}
+
+<form
+  {% if deal %}
+  hx-put="{{ prefix }}/deals/{{ deal.id }}"
+  {% else %}
+  method="post" action="{{ prefix }}/deals"
+  {% endif %}
+  {% if deal %}hx-target="body" hx-swap="outerHTML"{% endif %}
+  style="max-width:800px;">
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+    <!-- Linke Spalte -->
+    <div>
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Basis</div>
+
+        <div class="form-group">
+          <label>Titel *</label>
+          <input type="text" name="titel" value="{{ deal.titel if deal else '' }}" required placeholder="z.B. RACE Workshop – Müller GmbH">
+        </div>
+
+        <div class="form-group">
+          <label>Stage *</label>
+          <select name="stage" id="stage-select" onchange="updateConditionalFields(this.value)">
+            {% for s in stages %}
+            <option value="{{ s }}" {% if (deal and deal.stage == s) or (not deal and s == 'new') %}selected{% endif %}>
+              {{ s|replace('_',' ')|capitalize }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Owner *</label>
+          <select name="owner" id="owner-select" onchange="updateBackupDropdown()">
+            <option value="">– wählen –</option>
+            {% for o in owners %}
+            <option value="{{ o }}" {% if deal and deal.owner == o %}selected{% endif %}>{{ o|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Backup-Owner <span id="backup-required-label" style="color:#FCA5A5; display:none;">*</span></label>
+          <select name="backup_owner" id="backup-select">
+            <option value="">– optional / Pflicht ab Opportunity –</option>
+            {% for o in owners %}
+            <option value="{{ o }}" {% if deal and deal.backup_owner == o %}selected{% endif %}>{{ o|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Stage-spezifische Felder -->
+      <div class="card" id="conditional-fields" style="margin-bottom:16px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Stage-Felder</div>
+
+        <div class="form-group" id="field-followup">
+          <label>Follow-up-Datum <span id="followup-required" style="color:#FCA5A5; display:none;">*</span></label>
+          <input type="date" name="followup_datum" value="{{ deal.followup_datum or '' }}">
+        </div>
+
+        <div class="form-group" id="field-unterschrift" style="display:none;">
+          <label>Unterschriftsdatum <span style="color:#FCA5A5;">*</span></label>
+          <input type="date" name="unterschrift_datum" value="{{ deal.unterschrift_datum or '' }}">
+        </div>
+
+        <div class="form-group" id="field-projektstart" style="display:none;">
+          <label>Projektstartdatum <span style="color:#FCA5A5;">*</span></label>
+          <input type="date" name="projekt_start_datum" value="{{ deal.projekt_start_datum or '' }}">
+        </div>
+
+        <div class="form-group" id="field-verlust" style="display:none;">
+          <label>Verlustgrund <span style="color:#FCA5A5;">*</span></label>
+          <textarea name="verlust_grund" rows="3" placeholder="Warum wurde der Deal verloren?">{{ deal.verlust_grund or '' }}</textarea>
+        </div>
+
+        <div class="form-group" id="field-retry">
+          <label>Retry-Datum (optional)</label>
+          <input type="date" name="retry_datum" value="{{ deal.retry_datum or '' }}">
+        </div>
+      </div>
+    </div>
+
+    <!-- Rechte Spalte -->
+    <div>
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Finanzen</div>
+
+        <div class="form-group">
+          <label>ACV (€)</label>
+          <input type="number" name="acv" step="0.01" value="{{ deal.acv or '' }}" placeholder="z.B. 12000">
+        </div>
+
+        <div class="form-group">
+          <label>Discount (%)</label>
+          <input type="number" name="discount_pct" min="0" max="100" step="0.1" value="{{ deal.discount_pct or '' }}">
+        </div>
+
+        <div class="form-group">
+          <label>Deal-Kosten (€)</label>
+          <input type="number" name="deal_cost" step="0.01" value="{{ deal.deal_cost or '' }}" placeholder="Akquisekosten">
+        </div>
+
+        <div class="form-group" style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" name="risk_reversal" id="rr_check" value="1" style="width:auto;"
+            {% if deal and deal.risk_reversal %}checked{% endif %}>
+          <label for="rr_check" style="display:inline; cursor:pointer;">Risk Reversal</label>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Herkunft & Kontext</div>
+
+        <div class="form-group">
+          <label>Lead Source</label>
+          <select name="lead_source">
+            <option value="">– wählen –</option>
+            {% for ls in lead_sources %}
+            <option value="{{ ls }}" {% if deal and deal.lead_source == ls %}selected{% endif %}>{{ ls|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Lead Type</label>
+          <select name="lead_type">
+            <option value="">– wählen –</option>
+            {% for lt in lead_types %}
+            <option value="{{ lt }}" {% if deal and deal.lead_type == lt %}selected{% endif %}>{{ lt|replace('_',' ')|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>ICP-Persona</label>
+          <select name="icp_persona">
+            <option value="">– wählen –</option>
+            {% for ip in icp_personas %}
+            <option value="{{ ip }}" {% if deal and deal.icp_persona == ip %}selected{% endif %}>{{ ip|replace('_',' ')|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Verknüpfungen</div>
+
+        <div class="form-group">
+          <label>Person (optional)</label>
+          <select name="person_id">
+            <option value="">– keine –</option>
+            {% for p in personen %}
+            <option value="{{ p.id }}" {% if deal and deal.person_id == p.id %}selected{% endif %}>{{ p.vorname }} {{ p.nachname }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Unternehmen (optional)</label>
+          <select name="unternehmen_id">
+            <option value="">– keine –</option>
+            {% for u in unternehmen %}
+            <option value="{{ u.id }}" {% if deal and deal.unternehmen_id == u.id %}selected{% endif %}>{{ u.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Produkte (Multiselect) -->
+  <div class="card" style="margin-bottom:20px;">
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Produkte</div>
+    <div style="display:flex; flex-wrap:wrap; gap:10px;">
+      {% for p in products %}
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px; color:#F0F0F0; font-weight:400;">
+        <input type="checkbox" name="products" value="{{ p }}" style="width:auto;"
+          {% if p in selected_products %}checked{% endif %}>
+        {{ p|replace('_',' ')|upper }}
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Notes -->
+  <div class="card" style="margin-bottom:20px;">
+    <div class="form-group" style="margin:0;">
+      <label>Notizen</label>
+      <textarea name="notes" rows="3" placeholder="Interne Notizen zum Deal…">{{ deal.notes or '' }}</textarea>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:12px;">
+    <button type="submit" class="btn-primary">{% if deal %}Speichern{% else %}Deal anlegen{% endif %}</button>
+    <a href="{{ prefix }}/deals{% if deal %}/{{ deal.id }}{% endif %}" class="btn-secondary">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+const STAGES_REQUIRING_BACKUP = ['opportunity','discovery','proposal_sent','won','lost'];
+
+function updateConditionalFields(stage) {
+  const ff = document.getElementById('field-followup');
+  const fu = document.getElementById('field-unterschrift');
+  const fp = document.getElementById('field-projektstart');
+  const fv = document.getElementById('field-verlust');
+  const fr = document.getElementById('field-retry');
+  const reqLabel = document.getElementById('followup-required');
+  const backupReq = document.getElementById('backup-required-label');
+
+  // Backup required ab opportunity
+  if (STAGES_REQUIRING_BACKUP.includes(stage)) {
+    backupReq.style.display = 'inline';
+  } else {
+    backupReq.style.display = 'none';
+  }
+
+  // followup_datum: immer anzeigen aber nur bei opportunity required
+  ff.style.display = '';
+  reqLabel.style.display = stage === 'opportunity' ? 'inline' : 'none';
+
+  // won-spezifische Felder
+  fu.style.display = stage === 'won' ? '' : 'none';
+  fp.style.display = stage === 'won' ? '' : 'none';
+
+  // lost-spezifische Felder
+  fv.style.display = stage === 'lost' ? '' : 'none';
+  fr.style.display = (stage === 'lost' || stage === 'opportunity') ? '' : 'none';
+}
+
+function updateBackupDropdown() {
+  const ownerVal = document.getElementById('owner-select').value;
+  const backupSel = document.getElementById('backup-select');
+  // Alle Optionen aktivieren
+  for (let opt of backupSel.options) {
+    if (opt.value === ownerVal) {
+      opt.disabled = true;
+      opt.style.color = '#555';
+    } else {
+      opt.disabled = false;
+      opt.style.color = '';
+    }
+  }
+  // Wenn ausgewählter Backup == Owner, zurücksetzen
+  if (backupSel.value === ownerVal) backupSel.value = '';
+}
+
+// Initial aufrufen
+const initialStage = document.getElementById('stage-select').value;
+updateConditionalFields(initialStage);
+updateBackupDropdown();
+</script>
+{% endblock %}

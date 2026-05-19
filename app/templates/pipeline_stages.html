@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Stage-Definitionen – CBH CRM{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+  <a href="{{ prefix }}/pipeline" class="btn-secondary btn-sm">← Pipeline</a>
+</div>
+
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <div>
+    <h1 style="font-size:22px; font-weight:700; margin:0 0 4px 0;">Stage-Definitionen</h1>
+    <p style="color:#aaa; font-size:13px; margin:0;">Hier steht das "Warum" hinter jeder Stage. Einheitliche Bewertung im Team.</p>
+  </div>
+</div>
+
+<div style="display:flex; flex-direction:column; gap:12px;">
+{% for s in stage_defs %}
+<div class="card" style="border-left:4px solid
+  {% if s.stage == 'won' %}#34D399
+  {% elif s.stage == 'lost' %}#DC2626
+  {% elif s.stage == 'opportunity' %}#FB923C
+  {% elif s.stage == 'proposal_sent' %}#5870E2
+  {% elif s.stage == 'new' %}#9CA3AF
+  {% else %}#555{% endif %};">
+  <div style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+    <div style="flex:1; min-width:200px;">
+      <div style="font-size:16px; font-weight:700; color:#F0F0F0; margin-bottom:4px;">{{ s.label }}</div>
+      <div style="font-size:12px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:10px;">{{ s.stage }}</div>
+      <div style="font-size:14px; color:#ddd; line-height:1.6; margin-bottom:10px;">{{ s.trigger_condition }}</div>
+      {% if s.notes %}
+      <div style="font-size:12px; color:#777; line-height:1.5; border-top:1px solid #333; padding-top:8px;">{{ s.notes }}</div>
+      {% endif %}
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; min-width:160px; text-align:right;">
+      <div>
+        <div style="font-size:11px; color:#555; text-transform:uppercase; letter-spacing:0.08em;">Verantwortung</div>
+        <div style="font-size:12px; color:#aaa; margin-top:2px;">{{ s.owner_role }}</div>
+      </div>
+      {% if s.conv_target_pct %}
+      <div>
+        <div style="font-size:11px; color:#555; text-transform:uppercase; letter-spacing:0.08em;">Conversion-Ziel</div>
+        <div style="font-size:18px; font-weight:700; color:#FFFB76;">{{ s.conv_target_pct|int }}%</div>
+      </div>
+      {% endif %}
+      {% if s.avg_duration_days %}
+      <div>
+        <div style="font-size:11px; color:#555; text-transform:uppercase; letter-spacing:0.08em;">Ø Dauer</div>
+        <div style="font-size:14px; font-weight:600; color:#aaa;">{{ s.avg_duration_days }} Tage</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% endblock %}

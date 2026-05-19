@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}{{ deal.titel }} – CBH CRM{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+  <a href="{{ prefix }}/pipeline" class="btn-secondary btn-sm">← Pipeline</a>
+  <a href="{{ prefix }}/deals" class="btn-secondary btn-sm">Deals</a>
+  <span style="font-size:13px; color:#aaa; font-weight:600;">{{ deal.titel }}</span>
+</div>
+
+<!-- Header -->
+<div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+  <div>
+    <h1 style="font-size:24px; font-weight:700; margin:0 0 6px 0;">{{ deal.titel }}</h1>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      {% if deal.stage == 'won' %}<span class="badge badge-green" style="font-size:13px; padding:3px 10px;">WON</span>
+      {% elif deal.stage == 'lost' %}<span class="badge badge-red" style="font-size:13px; padding:3px 10px;">LOST</span>
+      {% elif deal.stage == 'opportunity' %}<span class="badge badge-orange" style="font-size:13px; padding:3px 10px;">OPPORTUNITY</span>
+      {% elif deal.stage == 'proposal_sent' %}<span class="badge badge-blue" style="font-size:13px; padding:3px 10px;">PROPOSAL SENT</span>
+      {% else %}<span class="badge" style="background:#2a2a2a; color:#F0F0F0; font-size:13px; padding:3px 10px;">{{ deal.stage|upper }}</span>
+      {% endif %}
+      {% for p in deal.products %}
+      <span class="badge badge-yellow">{{ p|replace('_',' ') }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <a href="{{ prefix }}/deals/{{ deal.id }}/edit" class="btn-primary">Bearbeiten</a>
+    {% if deal.stage == 'won' and not deal.project %}
+    <a href="{{ prefix }}/deals/{{ deal.id }}/create-project" class="btn-secondary" style="border-color:#34D399; color:#34D399;">Projekt anlegen</a>
+    {% elif deal.stage == 'won' and deal.project %}
+    <a href="{{ prefix }}/projects/{{ deal.project.id }}" class="btn-secondary" style="border-color:#34D399; color:#34D399;">→ Zum Projekt</a>
+    {% endif %}
+    <button
+      hx-delete="{{ prefix }}/deals/{{ deal.id }}"
+      hx-confirm="Deal wirklich löschen?"
+      hx-target="#delete-result"
+      hx-swap="innerHTML"
+      class="btn-danger btn-sm">Löschen</button>
+  </div>
+</div>
+<div id="delete-result"></div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
+  <!-- Deal-Info -->
+  <div class="card">
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Deal-Details</div>
+    <div style="display:grid; grid-template-columns:140px 1fr; gap:8px 12px; font-size:14px;">
+      <div style="color:#aaa; font-weight:600;">Owner</div>
+      <div><span class="badge badge-yellow">{{ deal.owner }}</span>
+        {% if deal.backup_owner %}<span style="color:#777; font-size:12px; margin-left:8px;">Backup: {{ deal.backup_owner }}</span>{% endif %}
+      </div>
+      <div style="color:#aaa; font-weight:600;">ACV</div>
+      <div style="font-weight:700; color:#FFFB76;">{% if deal.acv %}€{{ "{:,.0f}".format(deal.acv) }}{% else %}–{% endif %}</div>
+      <div style="color:#aaa; font-weight:600;">Discount</div>
+      <div>{% if deal.discount_pct %}{{ deal.discount_pct }}%{% else %}–{% endif %}</div>
+      <div style="color:#aaa; font-weight:600;">Risk Reversal</div>
+      <div>{% if deal.risk_reversal %}<span class="badge badge-green">Ja</span>{% else %}Nein{% endif %}</div>
+      <div style="color:#aaa; font-weight:600;">Lead Source</div>
+      <div>{{ deal.lead_source or '–' }}</div>
+      <div style="color:#aaa; font-weight:600;">Lead Type</div>
+      <div>{{ deal.lead_type|replace('_',' ')|capitalize if deal.lead_type else '–' }}</div>
+      <div style="color:#aaa; font-weight:600;">ICP-Persona</div>
+      <div>{{ deal.icp_persona|replace('_',' ')|capitalize if deal.icp_persona else '–' }}</div>
+      {% if deal.followup_datum %}
+      <div style="color:#aaa; font-weight:600;">Follow-up</div>
+      <div>{{ deal.followup_datum }}</div>
+      {% endif %}
+      {% if deal.stage == 'won' %}
+      <div style="color:#aaa; font-weight:600;">Unterschrift</div>
+      <div>{{ deal.unterschrift_datum or '–' }}</div>
+      <div style="color:#aaa; font-weight:600;">Projektstart</div>
+      <div>{{ deal.projekt_start_datum or '–' }}</div>
+      {% endif %}
+      {% if deal.stage == 'lost' %}
+      <div style="color:#aaa; font-weight:600;">Verlustgrund</div>
+      <div style="color:#FCA5A5;">{{ deal.verlust_grund or '–' }}</div>
+      {% if deal.retry_datum %}
+      <div style="color:#aaa; font-weight:600;">Retry</div>
+      <div>{{ deal.retry_datum }}</div>
+      {% endif %}
+      {% endif %}
+    </div>
+    {% if deal.notes %}
+    <div style="margin-top:14px; padding-top:14px; border-top:1px solid #333; font-size:13px; color:#ddd; line-height:1.5; white-space:pre-wrap;">{{ deal.notes }}</div>
+    {% endif %}
+  </div>
+
+  <!-- Person + Unternehmen -->
+  <div>
+    {% if deal.person_name or deal.person_id %}
+    <div class="card" style="margin-bottom:16px;">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:10px;">Person</div>
+      <a href="{{ prefix }}/personen/{{ deal.person_id }}" style="color:#5870E2; text-decoration:none; font-weight:600; font-size:15px;">{{ deal.person_name or 'Person #' + deal.person_id|string }}</a>
+    </div>
+    {% endif %}
+    {% if deal.unternehmen_name or deal.unternehmen_id %}
+    <div class="card" style="margin-bottom:16px;">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:10px;">Unternehmen</div>
+      <a href="{{ prefix }}/unternehmen/{{ deal.unternehmen_id }}" style="color:#5870E2; text-decoration:none; font-weight:600; font-size:15px;">{{ deal.unternehmen_name or 'Unternehmen #' + deal.unternehmen_id|string }}</a>
+    </div>
+    {% endif %}
+
+    <!-- Stage-Wechsel -->
+    {% if deal.stage not in ('won', 'lost') %}
+    <div class="card">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:10px;">Stage wechseln</div>
+      <form method="post" action="{{ prefix }}/deals/{{ deal.id }}/edit">
+        <input type="hidden" name="_method" value="PUT">
+        <select name="quick_stage" id="quick-stage-sel" style="width:100%; margin-bottom:8px;">
+          {% for s in stages %}
+          {% if s != deal.stage %}
+          <option value="{{ s }}">{{ s|replace('_',' ')|capitalize }}</option>
+          {% endif %}
+          {% endfor %}
+        </select>
+        <p style="color:#aaa; font-size:12px; margin:0 0 8px 0;">→ <a href="{{ prefix }}/deals/{{ deal.id }}/edit" style="color:#5870E2;">Vollständiges Edit-Formular</a> für Stage-Wechsel mit Pflichtfeldern</p>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Touchpoint-Timeline -->
+<div class="card" style="margin-bottom:20px;" id="touchpoints-section">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa;">Touchpoints</div>
+    <button onclick="document.getElementById('new-touchpoint-form').style.display='block'; this.style.display='none';" class="btn-primary btn-sm">+ Touchpoint</button>
+  </div>
+
+  <!-- Neuer Touchpoint Form (versteckt) -->
+  <div id="new-touchpoint-form" style="display:none; padding:14px; background:#1a1a1a; border-radius:6px; margin-bottom:14px;">
+    <form method="post" action="{{ prefix }}/touchpoints">
+      <input type="hidden" name="deal_id" value="{{ deal.id }}">
+      {% if deal.person_id %}<input type="hidden" name="person_id" value="{{ deal.person_id }}">{% endif %}
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
+        <div class="form-group" style="margin:0;">
+          <label>Art</label>
+          <select name="art" required>
+            <option value="anruf">Anruf</option>
+            <option value="email">E-Mail</option>
+            <option value="meeting">Meeting</option>
+            <option value="linkedin">LinkedIn</option>
+            <option value="notiz">Notiz</option>
+            <option value="other">Sonstiges</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Datum *</label>
+          <input type="date" name="datum" required value="{{ today }}">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Erstellt von *</label>
+          <select name="erstellt_von" required>
+            {% for o in ['christian','andre','michi','marco','tim'] %}
+            <option value="{{ o }}">{{ o|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Inhalt *</label>
+        <textarea name="inhalt" rows="2" required placeholder="Was wurde besprochen?"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Nächster Schritt</label>
+        <input type="text" name="naechster_schritt" placeholder="z.B. Angebot bis Freitag senden">
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button type="submit" class="btn-primary btn-sm">Speichern</button>
+        <button type="button" onclick="document.getElementById('new-touchpoint-form').style.display='none'; this.closest('div').previousElementSibling.querySelector('button').style.display=''" class="btn-secondary btn-sm">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Touchpoint-Liste -->
+  {% if touchpoints %}
+  <div style="display:flex; flex-direction:column; gap:10px;">
+    {% for tp in touchpoints %}
+    <div style="padding:12px; background:#1a1a1a; border-radius:6px; border-left:3px solid
+      {% if tp.art == 'anruf' %}#5870E2
+      {% elif tp.art == 'meeting' %}#FFFB76
+      {% elif tp.art == 'email' %}#34D399
+      {% elif tp.art == 'linkedin' %}#3B82F6
+      {% else %}#555{% endif %};">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <span class="badge" style="background:#2a2a2a; color:#aaa; text-transform:capitalize;">{{ tp.art }}</span>
+          <span style="font-size:12px; color:#777;">{{ tp.datum }}</span>
+          <span style="font-size:12px; color:#555;">von {{ tp.erstellt_von }}</span>
+        </div>
+      </div>
+      <div style="font-size:14px; color:#ddd; line-height:1.5; margin-bottom:{% if tp.naechster_schritt %}6px{% else %}0{% endif %};">{{ tp.inhalt }}</div>
+      {% if tp.naechster_schritt %}
+      <div style="font-size:12px; color:#FFFB76; margin-top:4px;">→ {{ tp.naechster_schritt }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="color:#555; font-size:13px; text-align:center; padding:20px 0;">Noch keine Touchpoints für diesen Deal.</div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+// Datum für Touchpoint-Form
+document.addEventListener('DOMContentLoaded', function() {
+  const dateInputs = document.querySelectorAll('input[type="date"][name="datum"]');
+  const today = new Date().toISOString().split('T')[0];
+  dateInputs.forEach(function(inp) { if (!inp.value) inp.value = today; });
+});
+
+document.body.addEventListener('htmx:afterRequest', function(evt) {
+  try {
+    var data = JSON.parse(evt.detail.xhr.responseText);
+    if (data.redirect) window.location.href = data.redirect;
+  } catch(e) {}
+});
+</script>
+{% endblock %}

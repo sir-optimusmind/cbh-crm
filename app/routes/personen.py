@@ -284,6 +284,28 @@ def person_detail(request: Request, person_id: int):
         ).fetchall()
         alle_unternehmen = [dict(u) for u in alle_unt]
 
+        # CRM-013: Touchpoints fuer diese Person (direkt + via Deals)
+        touchpoints_raw = conn.execute(
+            """SELECT t.*, d.titel as deal_titel
+               FROM touchpoint t
+               LEFT JOIN deal d ON d.id = t.deal_id
+               WHERE (t.person_id = ? OR
+                      t.deal_id IN (SELECT id FROM deal WHERE person_id=? AND deleted_at IS NULL))
+                 AND t.deleted_at IS NULL
+               ORDER BY t.datum DESC, t.created_at DESC""",
+            (person_id, person_id)
+        ).fetchall()
+        touchpoints = [dict(tp) for tp in touchpoints_raw]
+
+        # Aktive Deals dieser Person fuer Touchpoint-Dropdown
+        aktive_deals_raw = conn.execute(
+            """SELECT id, titel FROM deal
+               WHERE person_id=? AND deleted_at IS NULL AND stage NOT IN ("won","lost")
+               ORDER BY created_at DESC""",
+            (person_id,)
+        ).fetchall()
+        aktive_deals = [dict(d) for d in aktive_deals_raw]
+
     finally:
         conn.close()
 
@@ -293,6 +315,8 @@ def person_detail(request: Request, person_id: int):
         "verknuepfungen": verknuepfungen,
         "alle_unternehmen": alle_unternehmen,
         "stimmungen": STIMMUNGEN,
+        "touchpoints": touchpoints,
+        "aktive_deals": aktive_deals,
     })
 
 

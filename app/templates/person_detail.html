@@ -145,17 +145,108 @@
     </div>
   </div>
 </div>
-
-<!-- Touchpoint-Timeline Platzhalter (Sprint 2) -->
-<div class="card">
-  <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:10px;">Touchpoint-Timeline</div>
-  <div style="color:#555; font-size:13px; font-style:italic; padding:20px 0; text-align:center;">
-    Touchpoints folgen in Sprint 2. Hier wird die Interaktionshistorie angezeigt.
+<!-- Touchpoint-Timeline (CRM-013 Sprint 2) -->
+<div class="card" id="touchpoint-section">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa;">Touchpoint-History</div>
+    <button onclick="document.getElementById('add-tp-form').style.display='block'; this.style.display='none';" class="btn-primary btn-sm">+ Touchpoint</button>
   </div>
+
+  <!-- Form -->
+  <div id="add-tp-form" style="display:none; padding:14px; background:#1a1a1a; border-radius:6px; margin-bottom:14px;">
+    <form method="post" action="{{ prefix }}/touchpoints">
+      <input type="hidden" name="person_id" value="{{ person.id }}">
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
+        <div class="form-group" style="margin:0;">
+          <label>Art</label>
+          <select name="art" required>
+            <option value="anruf">Anruf</option>
+            <option value="email">E-Mail</option>
+            <option value="meeting">Meeting</option>
+            <option value="linkedin">LinkedIn</option>
+            <option value="notiz">Notiz</option>
+            <option value="other">Sonstiges</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Datum *</label>
+          <input type="date" name="datum" required id="tp-datum-person">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Erstellt von *</label>
+          <select name="erstellt_von" required>
+            <option value="christian">Christian</option>
+            <option value="andre">André</option>
+            <option value="michi">Michi</option>
+            <option value="marco">Marco</option>
+            <option value="tim">Tim</option>
+          </select>
+        </div>
+      </div>
+      {% if aktive_deals %}
+      <div class="form-group">
+        <label>Deal-Verknüpfung (optional)</label>
+        <select name="deal_id">
+          <option value="">– kein –</option>
+          {% for d in aktive_deals %}
+          <option value="{{ d.id }}">{{ d.titel }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="form-group">
+        <label>Inhalt *</label>
+        <textarea name="inhalt" rows="3" required placeholder="Was wurde besprochen?"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Nächster Schritt</label>
+        <input type="text" name="naechster_schritt" placeholder="z.B. Angebot bis Freitag senden">
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button type="submit" class="btn-primary btn-sm">Speichern</button>
+        <button type="button" onclick="document.getElementById('add-tp-form').style.display='none'; this.closest('#add-tp-form').previousElementSibling.querySelector('button').style.display=''" class="btn-secondary btn-sm">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Timeline -->
+  {% if touchpoints %}
+  <div style="display:flex; flex-direction:column; gap:10px;">
+    {% for tp in touchpoints %}
+    <div style="padding:12px; background:#1a1a1a; border-radius:6px; border-left:3px solid
+      {% if tp.art == 'anruf' %}#5870E2
+      {% elif tp.art == 'meeting' %}#FFFB76
+      {% elif tp.art == 'email' %}#34D399
+      {% elif tp.art == 'linkedin' %}#3B82F6
+      {% else %}#555{% endif %};">
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px;">
+        <span class="badge" style="background:#2a2a2a; color:#aaa; text-transform:capitalize;">{{ tp.art }}</span>
+        <span style="font-size:12px; color:#777;">{{ tp.datum }}</span>
+        <span style="font-size:12px; color:#555;">von {{ tp.erstellt_von }}</span>
+        {% if tp.deal_titel %}
+        <span style="font-size:11px; color:#5870E2;">Deal: {{ tp.deal_titel }}</span>
+        {% endif %}
+      </div>
+      <div style="font-size:14px; color:#ddd; line-height:1.5; white-space:pre-wrap;">{{ tp.inhalt }}</div>
+      {% if tp.naechster_schritt %}
+      <div style="font-size:12px; color:#FFFB76; margin-top:6px;">→ {{ tp.naechster_schritt }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="color:#555; font-size:13px; text-align:center; padding:24px 0;">
+    Noch keine Kontakte dokumentiert. <strong style="color:#aaa; cursor:pointer;" onclick="document.querySelector('.btn-primary.btn-sm').click()">Ersten Touchpoint anlegen</strong>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+  var dp = document.getElementById('tp-datum-person');
+  if (dp && !dp.value) dp.value = new Date().toISOString().split('T')[0];
+});
 document.body.addEventListener('htmx:afterRequest', function(evt) {
   var resp = evt.detail.xhr;
   if (resp.status === 200) {

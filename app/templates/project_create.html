@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Projekt anlegen – CBH CRM{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+  <a href="{{ prefix }}/deals/{{ deal.id }}" class="btn-secondary btn-sm">← Deal</a>
+</div>
+
+<h1 style="font-size:22px; font-weight:700; margin:0 0 6px 0;">Projekt anlegen</h1>
+<p style="color:#aaa; font-size:13px; margin:0 0 20px 0;">Deal <strong style="color:#FFFB76;">{{ deal.titel }}</strong> wurde gewonnen. Jetzt Projekt anlegen.</p>
+
+<form method="post" action="{{ prefix }}/deals/{{ deal.id }}/create-project" style="max-width:600px;">
+  <div class="card" style="margin-bottom:16px;">
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Projekt-Details</div>
+
+    <div class="form-group">
+      <label>Projektname *</label>
+      <input type="text" name="name" value="{{ deal.titel }}" required>
+    </div>
+
+    <div class="form-group">
+      <label>Delivery Owner * <span style="color:#FCA5A5;">(muss explizit gewählt werden)</span></label>
+      <select name="delivery_owner" required>
+        <option value="">– wählen –</option>
+        {% for o in owners %}
+        <option value="{{ o }}">{{ o|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Startdatum</label>
+      <input type="date" name="start_date" value="{{ deal.projekt_start_datum or '' }}">
+    </div>
+
+    <div class="form-group">
+      <label>Geplantes Enddatum</label>
+      <input type="date" name="end_date_planned">
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Finanzen</div>
+    <div style="padding:10px; background:#1a1a1a; border-radius:6px; margin-bottom:14px;">
+      <div style="font-size:12px; color:#aaa;">Übernahme aus Deal: ACV = <strong style="color:#FFFB76;">{% if deal.acv %}€{{ "{:,.0f}".format(deal.acv) }}{% else %}nicht gesetzt{% endif %}</strong></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Projekt-Kontext</div>
+
+    <div class="form-group">
+      <label>Outcome-Definition</label>
+      <textarea name="outcome_definition" rows="3" placeholder="Was ist das messbare Ergebnis dieses Projekts?"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Dokumentations-Link (Google Drive)</label>
+      <input type="url" name="dok_link" placeholder="https://drive.google.com/…">
+    </div>
+
+    <div class="form-group">
+      <label>Notizen</label>
+      <textarea name="notes" rows="2" placeholder="Interne Notizen zum Projekt…"></textarea>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:12px;">
+    <button type="submit" class="btn-primary">Projekt anlegen</button>
+    <a href="{{ prefix }}/deals/{{ deal.id }}" class="btn-secondary">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}
