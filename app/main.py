@@ -18,7 +18,7 @@ from app.routes.personen import router as personen_router
 from app.routes.unternehmen import router as unternehmen_router
 
 # ─── Konfiguration aus .env ───────────────────────────────────────────────────
-APP_PREFIX = os.getenv("APP_PREFIX", "/crm-staging").rstrip("/")
+APP_PREFIX = os.getenv("APP_PREFIX", "/mission-ctrl/crm-staging").rstrip("/")
 CRM_ENV    = os.getenv("CRM_ENV", "staging")
 
 _TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")

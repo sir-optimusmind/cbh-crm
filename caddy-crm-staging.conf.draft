@@ -1,0 +1,18 @@
+    # CRM – STAGING (Port 8506)
+    # WICHTIG: MIT X-Forwarded-User (MQ-03 Pflicht) via Caddy forward_auth oder header
+    # Mount-Pfad: /mission-ctrl/crm-staging/  (geaendert von /crm-staging/ → Sprint 2)
+    # Trailing-Slash-Redirect
+    @crm_staging_no_slash {
+        path /mission-ctrl/crm-staging
+    }
+    redir @crm_staging_no_slash /mission-ctrl/crm-staging/ permanent
+
+    handle /mission-ctrl/crm-staging/* {
+        basicauth {
+            # User: cbh-staging | Passwort: siehe #optimus_inbox (Slack)
+            cbh-staging $2a$14$XqF0Jz7EDZ8SqR.UZjk3.eG3HAL8Mr.EgrOhMFps1VNS6IjSd0CVu
+        }
+        header_up X-Forwarded-User {http.auth.user}
+        uri strip_prefix /mission-ctrl/crm-staging
+        reverse_proxy localhost:8506
+    }
