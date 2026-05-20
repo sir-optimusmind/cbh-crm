@@ -1,432 +1,498 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CBH MISSION CTRL · Tools</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MISSION CTRL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;900&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
 
-:root {
-  --black:        #111111;
-  --surface:      #181818;
-  --surface2:     #222222;
-  --border:       #2a2a2a;
-  --border-light: #383838;
-  --yellow:       #FFFB76;
-  --yellow-dim:   rgba(255,251,118,0.10);
-  --blue:         #5870E2;
-  --white:        #FFFFFF;
-  --text:         #E8E8E8;
-  --text-dim:     #999999;
-  --muted:        #555555;
-  --green:        #34d17a;
-  --green-dim:    rgba(52,209,122,0.12);
-  --orange:       #ffaa33;
-  --orange-dim:   rgba(255,170,51,0.12);
-  --teal:         #2fcfca;
-  --teal-dim:     rgba(47,207,202,0.12);
-}
+  <!-- Theme init: VOR CSS laden, kein FOUC -->
+  <script>
+    (function() {
+      function applyTheme(pref) {
+        var isDark = pref === 'dark' ||
+          (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        document.documentElement.classList.toggle('dark', isDark);
+        localStorage.setItem('cbh-theme', pref);
+        document.querySelectorAll('[data-theme-btn]').forEach(function(btn) {
+          btn.classList.toggle('active', btn.dataset.themeBtn === pref);
+        });
+      }
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+        if (localStorage.getItem('cbh-theme') === 'system') applyTheme('system');
+      });
+      var _saved = localStorage.getItem('cbh-theme') || 'dark';
+      applyTheme(_saved);
+    })();
+  </script>
 
-html { font-size: 16px; }
-body {
-  font-family: 'Barlow', sans-serif;
-  color: var(--text);
-  background: var(--black);
-  line-height: 1.6;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
+  <link rel="stylesheet" href="{{ prefix }}/static/app.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg-base); font-family: 'Barlow', sans-serif; height: 100%; }
 
-/* ===== TOPBAR ===== */
-.topbar {
-  background: var(--black);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-.topbar-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 32px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-.topbar-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.topbar-brand .rockfist {
-  height: 20px;
-  width: auto;
-  opacity: 0.85;
-  flex-shrink: 0;
-}
-.topbar-brand .sep {
-  color: var(--muted);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.75rem;
-  margin: 0 4px;
-}
-.topbar-brand .brand-text {
-  font-family: 'Barlow Semi Condensed', sans-serif;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--yellow);
-  white-space: nowrap;
-}
-.topbar-spacer { flex: 1; }
-.topbar-meta {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.68rem;
-  color: var(--muted);
-  white-space: nowrap;
-}
+    /* Shell-Layout: Topbar sticky + Sidebar fixed + Main scrollable */
+    .app-shell { display: flex; flex-direction: column; min-height: 100vh; }
 
-/* ===== HERO ===== */
-.hero {
-  background: var(--black);
-  border-bottom: 1px solid var(--border);
-  padding: 56px 32px 48px;
-}
-.hero-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-.hero-eyebrow {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.7rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.hero-eyebrow::before {
-  content: '';
-  display: inline-block;
-  width: 24px;
-  height: 2px;
-  background: var(--yellow);
-}
-.hero-title {
-  font-family: 'Barlow Semi Condensed', sans-serif;
-  font-size: 3rem;
-  font-weight: 800;
-  line-height: 1.0;
-  letter-spacing: -0.01em;
-  color: var(--white);
-  margin-bottom: 12px;
-  text-transform: uppercase;
-}
-.hero-title .accent { color: var(--yellow); }
-.hero-sub {
-  font-size: 0.95rem;
-  color: var(--text-dim);
-  max-width: 540px;
-  line-height: 1.55;
-}
+    /* Topbar */
+    .topbar {
+      position: sticky; top: 0; z-index: 1000;
+      height: 52px; background: var(--bg-nav);
+      border-bottom: 1px solid var(--border-sub);
+      display: flex; align-items: center;
+      padding: 0 20px; justify-content: space-between;
+      flex-shrink: 0;
+    }
 
-/* ===== MAIN ===== */
-main {
-  flex: 1;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 52px 32px 80px;
-  width: 100%;
-}
+    /* Sidebar */
+    #sidebar {
+      width: 220px;
+      height: calc(100vh - 52px);
+      background: var(--bg-nav);
+      border-right: 1px solid var(--border-sub);
+      position: fixed; left: 0; top: 52px;
+      z-index: 900; overflow-y: auto;
+      display: flex; flex-direction: column;
+    }
+    .section-label {
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--text-muted); padding: 0 12px;
+      margin-bottom: 6px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 8px;
+      height: 38px; padding: 0 12px; margin-bottom: 2px;
+      font-size: 13px; font-weight: 600; text-decoration: none;
+      color: var(--text-muted); background: transparent;
+      border-left: 2px solid transparent;
+      border-radius: 0 5px 5px 0;
+      transition: color 0.1s, background 0.1s;
+    }
+    .nav-item:hover { color: var(--text-primary); background: rgba(255,255,255,0.04); }
+    .nav-item.is-active {
+      color: var(--text-primary);
+      background: rgba(255,251,118,0.05);
+      border-left-color: var(--accent-yellow);
+    }
+    .nav-item--disabled {
+      display: flex; align-items: center; gap: 8px;
+      height: 38px; padding: 0 12px; margin-bottom: 2px;
+      font-size: 13px; font-weight: 600;
+      color: var(--border); border-left: 2px solid transparent;
+      border-radius: 0 5px 5px 0; cursor: default; pointer-events: none;
+    }
 
-/* ===== KACHEL-GRID ===== */
-.tools-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.68rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 24px;
-}
-.tools-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: var(--border);
-}
+    /* Main Content */
+    .content-area {
+      margin-left: 220px;
+      flex: 1; overflow-y: auto;
+      background: var(--bg-base);
+    }
+    @media (max-width: 1024px) {
+      .content-area { margin-left: 0; }
+      #sidebar { display: none; }
+    }
 
-/* ===== KACHEL ===== */
-.tool-card {
-  background: var(--surface);
-  padding: 32px 28px 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  position: relative;
-  transition: background 0.15s;
-}
-.tool-card:hover {
-  background: var(--surface2);
-}
-.tool-card.coming-soon {
-  opacity: 0.6;
-}
-.tool-card.coming-soon:hover {
-  background: var(--surface);
-  opacity: 0.6;
-  cursor: default;
-}
+    /* Tile Cards */
+    .tile-card {
+      background: var(--bg-header, #161616);
+      border: 1px solid var(--border-sub);
+      border-radius: 10px; padding: 22px;
+      text-decoration: none; display: block;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .tile-card:hover {
+      border-color: var(--accent-yellow);
+      box-shadow: 0 0 0 1px var(--accent-yellow), 0 4px 24px rgba(255,251,118,0.06);
+    }
+    .tile-card-disabled {
+      background: var(--bg-header, #161616);
+      border: 1px solid var(--border-sub);
+      border-radius: 10px; padding: 22px; opacity: 0.45;
+    }
+    .tile-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    }
+    @media (max-width: 640px) {
+      .tile-grid { grid-template-columns: 1fr; }
+    }
 
-.card-tag {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.62rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 20px;
-}
-
-.card-name {
-  font-family: 'Barlow Semi Condensed', sans-serif;
-  font-size: 1.3rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--white);
-  margin-bottom: 10px;
-}
-
-.card-desc {
-  font-size: 0.85rem;
-  color: var(--text-dim);
-  line-height: 1.5;
-  flex: 1;
-  margin-bottom: 24px;
-}
-
-.card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-/* Status-Badge */
-.status-badge {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.62rem;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 5px 10px;
-  border: 1px solid;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.status-badge::before {
-  content: '';
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-}
-.status-badge.live {
-  color: var(--green);
-  border-color: var(--green);
-  background: var(--green-dim);
-}
-.status-badge.live::before { background: var(--green); }
-
-.status-badge.staging {
-  color: var(--teal);
-  border-color: var(--teal);
-  background: var(--teal-dim);
-}
-.status-badge.staging::before { background: var(--teal); }
-
-.status-badge.coming-soon {
-  color: var(--orange);
-  border-color: var(--orange);
-  background: var(--orange-dim);
-}
-.status-badge.coming-soon::before { background: var(--orange); opacity: 0.5; }
-
-/* CTA-Button */
-.card-cta {
-  font-family: 'Barlow Semi Condensed', sans-serif;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  text-decoration: none;
-  color: var(--black);
-  background: var(--yellow);
-  padding: 8px 18px;
-  display: inline-block;
-  transition: opacity 0.12s;
-  white-space: nowrap;
-}
-.card-cta:hover { opacity: 0.88; }
-.card-cta.disabled {
-  background: var(--surface2);
-  color: var(--muted);
-  border: 1px solid var(--border-light);
-  cursor: default;
-}
-.card-cta.disabled:hover { opacity: 1; }
-
-/* Divider-Linie oben an der Kachel */
-.tool-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: transparent;
-  transition: background 0.15s;
-}
-.tool-card:not(.coming-soon):hover::before {
-  background: var(--yellow);
-}
-
-/* ===== FOOTER ===== */
-footer {
-  background: var(--black);
-  border-top: 1px solid var(--border);
-  padding: 18px 32px;
-}
-footer .footer-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-footer .footer-brand {
-  font-family: 'Barlow Semi Condensed', sans-serif;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-footer .footer-meta {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.65rem;
-  color: var(--muted);
-}
-
-/* ===== RESPONSIVE ===== */
-@media (max-width: 900px) {
-  .tools-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 767px) {
-  .topbar-inner { padding: 0 20px; }
-  .hero { padding: 40px 20px 36px; }
-  .hero-title { font-size: 2.2rem; }
-  main { padding: 36px 20px 60px; }
-  .tools-grid {
-    grid-template-columns: 1fr;
-    gap: 1px;
-  }
-  .tool-card { padding: 28px 20px 24px; }
-  footer { padding: 16px 20px; }
-  .topbar-meta { display: none; }
-}
-</style>
+    /* Theme Switcher (Settings-Panel) */
+    #settings-panel {
+      display: none; position: absolute;
+      top: calc(100% + 6px); right: 0; z-index: 50;
+      background: var(--bg-header, #161616);
+      border: 1px solid var(--border-sub); border-radius: 10px;
+      padding: 24px; width: 300px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+    }
+    #settings-panel.open { display: block; }
+    .theme-switcher { display: inline-flex; }
+    .theme-switcher button {
+      padding: 5px 12px; background: var(--bg-card, #252525);
+      border: 1px solid var(--border-sub); color: var(--text-muted);
+      font-family: 'Barlow', sans-serif; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .theme-switcher button:first-child { border-radius: 6px 0 0 6px; }
+    .theme-switcher button:last-child { border-radius: 0 6px 6px 0; }
+    .theme-switcher button.active { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+    .settings-section-divider { border: none; border-top: 1px solid var(--border-sub); margin: 20px 0; }
+  </style>
 </head>
 <body>
+<div class="app-shell">
 
-<!-- TOPBAR -->
-<div class="topbar">
-  <div class="topbar-inner">
-    <div class="topbar-brand">
-      <!-- Rockfist Signet: inline SVG, white, transparent bg, 20px Höhe -->
-      <svg class="rockfist" viewBox="0 0 1000 1001" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M454.284 351.833C489.982 344.582 519.572 354.072 545.148 379.136C570.407 354.68 599.997 344.046 636.279 352.15C636.279 329.738 635.574 308.713 636.45 287.761C637.886 253.328 654.871 228.215 686.505 215.051C718.14 201.886 747.949 207.629 773.525 230.6C790.631 245.955 799.441 265.909 799.489 288.881C799.708 408.094 800.462 527.331 799.392 646.545C798.272 772.718 692.662 878.985 566.513 881.297C523.32 882.1 479.762 885.702 437.006 874.459C394.884 863.387 358.042 843.141 327.089 812.553C292.777 778.631 258.661 744.514 224.69 710.252C191.669 676.963 191.815 625.715 224.861 592.255C243.671 573.201 262.457 554.172 281.73 535.605C288.324 529.254 291.171 522.757 291.147 513.388C290.806 409.165 290.855 304.965 291.001 200.742C291.05 165.579 311.977 135.964 344.415 123.992C376.171 112.263 411.309 121.242 434.086 147.085C447.811 162.659 454.235 181.08 454.284 201.715C454.357 247.123 454.308 292.555 454.308 337.963C454.284 342.343 454.284 346.699 454.284 351.833ZM545.026 604.69C527.505 620.507 507.235 628.148 483.898 628.173C480.565 628.173 476.72 631.409 474.019 634.061C456.936 650.803 440.121 667.813 423.209 684.75C410.02 697.963 395.663 699.35 384.761 688.448C374.881 678.593 376.39 663.141 388.581 650.852C406.297 633.015 424.28 615.421 441.825 597.438C458.688 580.161 462.509 555.121 451.948 534.559C434.622 500.88 392.742 493.823 364.661 520.956C329.96 554.489 296.136 588.921 262.116 623.135C243.33 642.043 243.306 660.245 262.141 679.226C295.26 712.637 328.281 746.145 362.008 778.923C398.145 814.062 441.873 832.166 492.391 833.14C513.465 833.553 534.562 833.334 555.66 833.188C667.671 832.483 751.137 748.335 751.186 636.008C751.234 524.484 751.21 412.936 751.186 301.413C751.186 296.959 751.332 292.482 751.015 288.029C749.774 271.19 737.364 258.682 720.549 257.076C704.172 255.494 689.425 266.055 685.581 282.675C684.413 287.737 684.291 293.115 684.291 298.347C684.218 380.28 684.34 462.189 684.194 544.122C684.121 586.975 656.501 619.899 614.938 626.785C588.268 631.19 565.54 621.992 545.026 604.69ZM405.81 454.329C405.81 432.769 405.81 410.576 405.81 388.383C405.786 326.404 405.907 264.449 405.688 202.47C405.615 180.034 389.555 165.579 368.238 167.866C350.742 169.74 339.426 183.367 339.378 203.735C339.232 291.63 339.304 379.525 339.329 467.396C339.329 470.097 339.815 472.774 340.108 475.719C350.888 470.754 360.719 465.133 371.255 461.678C381.938 458.222 393.326 456.884 405.81 454.329ZM636.206 483.7C636.206 463.454 636.425 443.208 636.133 422.986C635.866 403.3 622.652 393.737 603.574 398.993C582.647 404.76 569.409 421.575 569.263 443.476C569.044 476.254 569.141 509.056 569.239 541.835C569.287 564.368 583.158 579.577 603.234 579.382C622.555 579.188 635.963 564.125 636.182 542.005C636.352 522.562 636.206 503.119 636.206 483.7ZM505.605 571.498C507.284 572.009 508.963 572.545 510.642 573.056C513.976 564.539 519.937 556.095 520.205 547.48C521.325 511.904 521.179 476.278 520.546 440.677C520.157 418.655 504.485 401.889 482.779 397.971C466.573 395.051 454.819 404.371 454.357 420.918C454.04 432.233 454.868 443.622 454.065 454.889C453.359 464.671 455.865 471.363 464.601 477.008C471.902 481.705 478.107 488.567 483.752 495.332C502.076 517.33 507.795 543.319 505.605 571.498Z" fill="white"/>
-      </svg>
-      <span class="sep">|</span>
-      <span class="brand-text">CBH Mission CTRL</span>
+  <!-- Topbar -->
+  <header class="topbar">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <!-- Mobile: Sidebar-Toggle (nur mobile) -->
+      <button id="sidebar-toggle-btn" onclick="toggleSidebar()"
+        style="display:none; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px;"
+        title="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <img src="{{ prefix }}/static/brand/logo-white-transparent.svg"
+           alt="CBH" style="height:20px; opacity:0.85;" />
+      <span style="color:var(--border-sub); font-size:12px;">|</span>
+      <span style="font-family:'Barlow',sans-serif; font-weight:900; text-transform:uppercase;
+                   color:var(--text-primary); font-size:13px; letter-spacing:0.14em;">
+        MISSION CTRL
+      </span>
     </div>
-    <div class="topbar-spacer"></div>
-    <div class="topbar-meta">v2.0 · Sprint 2 · 2026</div>
-  </div>
+
+    <!-- Rechts: Settings + User -->
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div style="position:relative;" id="topbar-settings-wrapper">
+        <button id="topbar-settings-btn" onclick="toggleTopbarSettings()"
+          style="display:flex; align-items:center; gap:6px; height:30px; padding:0 12px;
+                 background:transparent; border:1px solid var(--border-sub); border-radius:6px;
+                 color:var(--text-muted); font-family:'Barlow',sans-serif; font-size:12px;
+                 font-weight:600; cursor:pointer; transition:all 0.15s;"
+          title="Settings">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          Settings
+        </button>
+        <div id="settings-panel">
+          <div class="section-label" style="padding:0; margin-bottom:8px;">Theme</div>
+          <div class="theme-switcher">
+            <button onclick="applyTheme('dark')" data-theme-btn="dark">Dunkel</button>
+            <button onclick="applyTheme('system')" data-theme-btn="system">System</button>
+            <button onclick="applyTheme('light')" data-theme-btn="light">Hell</button>
+          </div>
+          <hr class="settings-section-divider">
+          <form action="{{ prefix }}/auth/logout" method="post">
+            <button type="submit"
+              style="width:100%; padding:8px 16px; background:transparent;
+                     border:1px solid var(--border-sub); border-radius:6px;
+                     color:var(--text-muted); font-family:'Barlow',sans-serif;
+                     font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s;"
+              onmouseover="this.style.borderColor='var(--status-error)'; this.style.color='var(--status-error)'"
+              onmouseout="this.style.borderColor='var(--border-sub)'; this.style.color='var(--text-muted)'">
+              Abmelden
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <span style="color:var(--border-sub);">|</span>
+
+      <!-- Avatar + Name -->
+      <div style="display:flex; align-items:center; gap:8px;">
+        {% set user_slug = user_display_name.split()[0].lower() %}
+        <div style="width:30px; height:30px; border-radius:50%; overflow:hidden;
+                    background:var(--accent-blue); flex-shrink:0;
+                    display:flex; align-items:center; justify-content:center;
+                    font-size:12px; font-weight:700; color:#fff;">
+          {% if user_slug in ['christian', 'andre', 'michi', 'marco', 'tim'] %}
+          <img src="{{ prefix }}/static/avatars/{{ user_slug }}.png" alt="{{ user_display_name[0]|upper }}"
+               style="width:100%; height:100%; object-fit:cover;"
+               onerror="this.style.display='none'; this.parentElement.textContent='{{ user_display_name[0]|upper }}'">
+          {% else %}
+          {{ user_display_name[0] | upper }}
+          {% endif %}
+        </div>
+        <span style="font-size:13px; font-weight:600; color:var(--text-secondary);">{{ user_display_name }}</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <nav style="padding:16px 0 12px; flex:1;">
+
+      <div class="section-label" style="margin-top:0; margin-bottom:6px;">Workspace</div>
+
+      <!-- Home (active) -->
+      <a href="{{ prefix }}/" class="nav-item is-active" aria-current="page">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        <span>Uebersicht</span>
+      </a>
+
+      <div class="section-label" style="margin-top:20px; margin-bottom:6px;">Tools</div>
+
+      <!-- Cold Calling -->
+      <a href="{{ COLDCALL_URL }}" class="nav-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.36 2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.86a16 16 0 0 0 6.06 6.06l.96-.96a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+        </svg>
+        <span>Cold Calling</span>
+      </a>
+
+      <!-- CRM -->
+      <a href="{{ CRM_URL }}" class="nav-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        <span>CRM</span>
+      </a>
+
+      <!-- Deal Pipeline -->
+      <a href="{{ PIPELINE_URL }}" class="nav-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+          <polyline points="17 6 23 6 23 12"/>
+        </svg>
+        <span>Deal Pipeline</span>
+      </a>
+
+      <!-- Projekte -->
+      <a href="{{ PROJECTS_URL }}" class="nav-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span>Projekte</span>
+      </a>
+
+      <!-- Storyteller (Disabled) -->
+      <div class="nav-item--disabled">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+             style="opacity:0.4;">
+          <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+        </svg>
+        <span>Storyteller</span>
+        <span style="margin-left:auto; font-size:10px; color:var(--border); letter-spacing:0.05em;">bald</span>
+      </div>
+
+    </nav>
+
+    <!-- Account-Footer: Avatar-Reihe + Logout -->
+    <div style="padding-bottom:8px; flex-shrink:0;" id="account-footer">
+      <div style="height:1px; background:var(--border-sub); margin:4px 12px 10px;"></div>
+      <div class="section-label" style="margin-top:0; margin-bottom:8px;">Team</div>
+
+      <!-- Avatar-Reihe: User-Avatare -->
+      <div style="display:flex; align-items:center; gap:6px; padding:0 12px; margin-bottom:10px;">
+        {% for member in [
+          {'slug': 'christian', 'name': 'Christian', 'color': '#5870E2'},
+          {'slug': 'andre',     'name': 'Andre',     'color': '#7C3AED'},
+          {'slug': 'michi',     'name': 'Michi',     'color': '#0891B2'},
+          {'slug': 'marco',     'name': 'Marco',     'color': '#059669'},
+          {'slug': 'tim',       'name': 'Tim',       'color': '#D97706'}
+        ] %}
+        <div title="{{ member.name }}{% if member.name.lower() == user_display_name.split()[0].lower() %} (Du){% endif %}"
+             style="width:34px; height:34px; border-radius:50%; flex-shrink:0; overflow:hidden;
+                    display:flex; align-items:center; justify-content:center;
+                    font-size:12px; font-weight:700; color:#fff;
+                    background:{{ member.color }}; cursor:default;
+                    {% if member.name.lower() == user_display_name.split()[0].lower() %}
+                    box-shadow:0 0 0 2px var(--accent-yellow);
+                    {% endif %}">
+          <img src="{{ prefix }}/static/avatars/{{ member.slug }}.png"
+               alt="{{ member.name[0]|upper }}"
+               style="width:100%; height:100%; object-fit:cover;"
+               onerror="this.style.display='none'; this.parentElement.textContent='{{ member.name[0]|upper }}'">
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Logout -->
+      <form action="{{ prefix }}/auth/logout" method="post" style="margin:0;">
+        <button type="submit"
+          style="display:flex; align-items:center; gap:8px; width:100%;
+                 height:38px; padding:0 12px; margin-bottom:2px;
+                 font-size:13px; font-weight:600; text-align:left;
+                 color:var(--text-muted); background:transparent;
+                 border:none; border-left:2px solid transparent;
+                 border-radius:0 5px 5px 0;
+                 cursor:pointer; font-family:'Barlow',sans-serif;
+                 transition:color 0.1s, background 0.1s;"
+          onmouseover="this.style.color='#F87171'; this.style.background='rgba(239,68,68,0.08)'"
+          onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          <span>Abmelden</span>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="content-area">
+    <div style="padding:48px 40px;">
+      <div style="max-width:960px; margin:0 auto;">
+
+        <!-- Page Header -->
+        <div style="margin-bottom:40px;">
+          <h1 style="font-size:26px; font-weight:900; color:var(--text-primary); margin:0 0 6px; letter-spacing:0.02em;">
+            MISSION CTRL
+          </h1>
+          <p style="font-size:13px; color:var(--text-muted); margin:0; font-weight:600; letter-spacing:0.06em; text-transform:uppercase;">
+            CBH Tool Suite
+          </p>
+        </div>
+
+        <!-- Tools -->
+        <section>
+          <div class="section-label" style="padding:0; margin-bottom:16px;">Tools</div>
+          <div class="tile-grid">
+
+            <!-- 1. Storyteller – Coming Soon -->
+            <div class="tile-card-disabled">
+              <div style="display:flex; align-items:start; justify-content:space-between; margin-bottom:14px;">
+                <div style="font-size:22px; opacity:0.35;">&#9997;&#65039;</div>
+                <span style="font-size:11px; font-weight:700; padding:3px 10px; border-radius:4px; letter-spacing:0.05em;
+                             background:var(--bg-inset, #1E1E1E); color:var(--border);">
+                  COMING SOON
+                </span>
+              </div>
+              <h3 style="font-size:15px; font-weight:800; color:var(--text-muted); margin:0 0 6px;">Storyteller</h3>
+              <p style="font-size:12px; color:var(--border); line-height:1.6; margin:0;">
+                LinkedIn-Content, Artikel und Briefings aus einem Prompt.
+              </p>
+            </div>
+
+            <!-- 2. Cold Calling – Live -->
+            <a href="{{ COLDCALL_URL }}" class="tile-card">
+              <div style="display:flex; align-items:start; justify-content:space-between; margin-bottom:14px;">
+                <div style="font-size:22px;">&#128222;</div>
+                <span style="font-size:11px; font-weight:700; padding:3px 10px; border-radius:4px; letter-spacing:0.05em;
+                             background:rgba(22,163,74,0.12); color:var(--status-success);">
+                  &#9679; AKTIV
+                </span>
+              </div>
+              <h3 style="font-size:15px; font-weight:800; color:var(--text-primary); margin:0 0 6px;">Cold Calling</h3>
+              <p style="font-size:12px; color:var(--text-muted); line-height:1.6; margin:0;">
+                Outbound-Kampagnen, Gesprächsprotokolle und Pipeline-Tracking.
+              </p>
+            </a>
+
+            <!-- 3. CRM – Live -->
+            <a href="{{ CRM_URL }}" class="tile-card">
+              <div style="display:flex; align-items:start; justify-content:space-between; margin-bottom:14px;">
+                <div style="font-size:22px;">&#128101;</div>
+                <span style="font-size:11px; font-weight:700; padding:3px 10px; border-radius:4px; letter-spacing:0.05em;
+                             background:rgba(22,163,74,0.12); color:var(--status-success);">
+                  &#9679; AKTIV
+                </span>
+              </div>
+              <h3 style="font-size:15px; font-weight:800; color:var(--text-primary); margin:0 0 6px;">CRM</h3>
+              <p style="font-size:12px; color:var(--text-muted); line-height:1.6; margin:0;">
+                Kontaktverwaltung, Kundenhistorie und Relationship-Tracking.
+              </p>
+            </a>
+
+            <!-- 4. Deal Pipeline – Live -->
+            <a href="{{ PIPELINE_URL }}" class="tile-card">
+              <div style="display:flex; align-items:start; justify-content:space-between; margin-bottom:14px;">
+                <div style="font-size:22px;">&#128202;</div>
+                <span style="font-size:11px; font-weight:700; padding:3px 10px; border-radius:4px; letter-spacing:0.05em;
+                             background:rgba(22,163,74,0.12); color:var(--status-success);">
+                  &#9679; AKTIV
+                </span>
+              </div>
+              <h3 style="font-size:15px; font-weight:800; color:var(--text-primary); margin:0 0 6px;">Deal Pipeline</h3>
+              <p style="font-size:12px; color:var(--text-muted); line-height:1.6; margin:0;">
+                Von Interessent bis Kunde. Funnel-Tracking für das gesamte Team.
+              </p>
+            </a>
+
+            <!-- 5. Projekte – Live -->
+            <a href="{{ PROJECTS_URL }}" class="tile-card">
+              <div style="display:flex; align-items:start; justify-content:space-between; margin-bottom:14px;">
+                <div style="font-size:22px;">&#128193;</div>
+                <span style="font-size:11px; font-weight:700; padding:3px 10px; border-radius:4px; letter-spacing:0.05em;
+                             background:rgba(22,163,74,0.12); color:var(--status-success);">
+                  &#9679; AKTIV
+                </span>
+              </div>
+              <h3 style="font-size:15px; font-weight:800; color:var(--text-primary); margin:0 0 6px;">Projekte</h3>
+              <p style="font-size:12px; color:var(--text-muted); line-height:1.6; margin:0;">
+                Projektübersicht, Meilensteine und Delivery-Tracking.
+              </p>
+            </a>
+
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
 </div>
 
-<!-- HERO -->
-<header class="hero">
-  <div class="hero-inner">
-    <div class="hero-eyebrow">Your Tools</div>
-    <h1 class="hero-title">Mission <span class="accent">CTRL</span></h1>
-    <p class="hero-sub">Alle CBH Sales-Tools an einem Ort. Kein HubSpot. Kein Overhead. Kontrolle.</p>
-  </div>
-</header>
+<script>
+  // Theme Apply (auch von data-theme-btn aufgerufen)
+  function applyTheme(pref) {
+    var isDark = pref === 'dark' ||
+      (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    document.documentElement.classList.toggle('dark', isDark);
+    localStorage.setItem('cbh-theme', pref);
+    document.querySelectorAll('[data-theme-btn]').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.themeBtn === pref);
+    });
+  }
 
-<!-- MAIN -->
-<main>
-  <div class="tools-label">Tools · 3 verfügbar</div>
+  // Topbar-Settings-Toggle
+  function toggleTopbarSettings() {
+    var panel = document.getElementById('settings-panel');
+    panel.classList.toggle('open');
+  }
+  document.addEventListener('click', function(e) {
+    var wrapper = document.getElementById('topbar-settings-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+      document.getElementById('settings-panel').classList.remove('open');
+    }
+  });
 
-  <div class="tools-grid">
+  // Mobile Sidebar Toggle
+  function toggleSidebar() {
+    var sidebar = document.getElementById('sidebar');
+    sidebar.style.display = sidebar.style.display === 'flex' ? 'none' : 'flex';
+  }
 
-    <!-- KACHEL 1: COLD CALLING -->
-    <div class="tool-card">
-      <div class="card-tag">Outbound · Sales</div>
-      <div class="card-name">Cold Calling</div>
-      <p class="card-desc">Outbound-Tracking, Joker-System und Tagesstatistik. Jeder Anruf zählt.</p>
-      <div class="card-footer">
-        <span class="status-badge live">Live</span>
-        <!-- Finn füllt die echte URL ein -->
-        <a class="card-cta" href="COLDCALL_URL">Öffnen</a>
-      </div>
-    </div>
-
-    <!-- KACHEL 2: CRM -->
-    <div class="tool-card">
-      <div class="card-tag">Pipeline · Kontakte</div>
-      <div class="card-name">CRM</div>
-      <p class="card-desc">Pipeline, Kontakte, Deals und Touchpoints. HubSpot-Ablösung, komplett in MISSION CTRL.</p>
-      <div class="card-footer">
-        <span class="status-badge staging">Staging</span>
-        <!-- Finn füllt die echte URL ein -->
-        <a class="card-cta" href="CRM_URL">Öffnen</a>
-      </div>
-    </div>
-
-    <!-- KACHEL 3: STORYTELLER -->
-    <div class="tool-card coming-soon">
-      <div class="card-tag">Content · LinkedIn</div>
-      <div class="card-name">Storyteller</div>
-      <p class="card-desc">Inhalts-Creation, LinkedIn-Reaktion und Artikel-Pipeline.</p>
-      <div class="card-footer">
-        <span class="status-badge coming-soon">Coming Soon</span>
-        <span class="card-cta disabled">Coming Soon</span>
-      </div>
-    </div>
-
-  </div>
-</main>
-
-<!-- FOOTER -->
-<footer>
-  <div class="footer-inner">
-    <span class="footer-brand">CBH Mission CTRL · Alle Rechte vorbehalten</span>
-    <span class="footer-meta">Build 2026-05-19 · Sprint 2</span>
-  </div>
-</footer>
-
+  // Theme-Buttons: aktiven Zustand setzen beim Load
+  (function() {
+    var saved = localStorage.getItem('cbh-theme') || 'dark';
+    applyTheme(saved);
+  })();
+</script>
 </body>
 </html>
