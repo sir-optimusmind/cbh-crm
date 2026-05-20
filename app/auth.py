@@ -122,8 +122,17 @@ def _write_login_audit(email: str, action: str, ip: str | None = None) -> None:
 # ─── Session-Hilfsfunktionen ─────────────────────────────────────────────────
 
 def get_current_user(request: Request) -> dict | None:
-    """Gibt den eingeloggten User-Dict zurück oder None."""
-    return request.session.get("user")
+    """Gibt den eingeloggten User-Dict zurück oder None.
+    Prüft zusätzlich Midnight-Expiry (CRM-103).
+    """
+    user = request.session.get("user")
+    if not user:
+        return None
+    # Midnight-Expiry prüfen
+    if is_session_expired(request):
+        request.session.clear()
+        return None
+    return user
 
 
 def require_login(request: Request) -> dict | None:
@@ -173,6 +182,7 @@ _LOGIN_HTML = """<!DOCTYPE html>
 </head>
 <body>
   <div class="login-box">
+    <img src="{app_prefix}/static/brand/Symbol-white-transparent.svg" alt="CBH Rockfist" style="height:55px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto;">
     <div class="brand">CBH</div>
     <div class="brand-sub">MISSION CTRL</div>
     {error_block}
@@ -248,6 +258,7 @@ async def auth_callback(request: Request):
         logger.warning("OAuth-Token-Fehler: %s", exc)
         login_url = f"{APP_PREFIX}/auth/login"
         html = _LOGIN_HTML.format(
+            app_prefix=APP_PREFIX,
             login_url=login_url,
             error_style=".error{background:rgba(220,38,38,0.15);border:1px solid #DC2626;color:#FCA5A5;padding:10px 14px;border-radius:6px;margin-bottom:20px;font-size:13px;}",
             error_block='<div class="error">Anmeldung fehlgeschlagen. Bitte erneut versuchen.</div>'
@@ -260,6 +271,7 @@ async def auth_callback(request: Request):
     if not email:
         login_url = f"{APP_PREFIX}/auth/login"
         html = _LOGIN_HTML.format(
+            app_prefix=APP_PREFIX,
             login_url=login_url,
             error_style=".error{background:rgba(220,38,38,0.15);border:1px solid #DC2626;color:#FCA5A5;padding:10px 14px;border-radius:6px;margin-bottom:20px;font-size:13px;}",
             error_block='<div class="error">E-Mail konnte nicht gelesen werden.</div>'
@@ -286,6 +298,9 @@ async def auth_callback(request: Request):
         "role":     user["role"],
         "color":    user.get("color_hex", "#5870E2"),
     }
+
+    # Midnight-Expiry in Session schreiben (CRM-103)
+    set_session_expiry(request)
 
     # last_login + Audit
     _update_last_login(email)
