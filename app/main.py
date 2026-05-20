@@ -25,6 +25,7 @@ from app.shared.templating import render
 from app.modules.crm.routes import router as crm_router
 from app.modules.pipeline.routes import router as pipeline_router
 from app.modules.projects.routes import router as projects_router
+from app.shared.drive_auth import router as drive_auth_router
 
 # ─── Konfiguration aus .env ───────────────────────────────────────────────────
 APP_PREFIX = os.getenv("APP_PREFIX", "/mission-ctrl/crm-staging").rstrip("/")
@@ -44,7 +45,7 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
     lifespan=lifespan,
-    root_path=APP_PREFIX,
+    # root_path entfernt – kommt jetzt via uvicorn --root-path
 )
 
 # ─── Static Files ─────────────────────────────────────────────────────────────
@@ -105,6 +106,7 @@ app.include_router(auth_router)
 app.include_router(crm_router)
 app.include_router(pipeline_router)
 app.include_router(projects_router)
+app.include_router(drive_auth_router)
 
 
 # ─── Health-Check (oeffentlich) ───────────────────────────────────────────────

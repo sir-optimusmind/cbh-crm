@@ -686,18 +686,27 @@ async def deal_stage_patch(request: Request, deal_id: int):
 
 @router.post("/deals/{deal_id}/won-modal")
 async def deal_won_modal_post(request: Request, deal_id: int):
-    """CRM-060: Won-Abschluss via Modal (kein Page-Wechsel).
-    Body: JSON mit unterschrift_datum, projekt_start_datum, delivery_owner, name, angebotsbetrag"""
+    """CRM-060 + CRM-067: Won-Abschluss via Modal (kein Page-Wechsel).
+    Body: JSON mit unterschrift_datum, projekt_start_datum, delivery_owner,
+          drive_folder_id, drive_folder_name, drive_folder_url, angebotsbetrag
+
+    CRM-067: name kommt aus drive_folder_name (Projekt-Kurzname entfaellt).
+    Audit-Log: 3 Eintraege (deal UPDATE, project CREATE, project LINK_DRIVE).
+    """
     prefix = request.scope.get("root_path", "")
     user = get_user(request)
     ip = get_client_ip(request)
 
     body = await request.json()
-    unterschrift_datum = body.get("unterschrift_datum", "").strip()
+    unterschrift_datum  = body.get("unterschrift_datum", "").strip()
     projekt_start_datum = body.get("projekt_start_datum", "").strip()
-    delivery_owner = body.get("delivery_owner", "").strip()
-    name = body.get("name", "").strip()
-    angebotsbetrag = body.get("angebotsbetrag")
+    delivery_owner      = body.get("delivery_owner", "").strip()
+    angebotsbetrag      = body.get("angebotsbetrag")
+
+    # CRM-067: Drive-Felder (ersetzen Projekt-Kurzname)
+    drive_folder_id   = (body.get("drive_folder_id", "") or "").strip()
+    drive_folder_name = (body.get("drive_folder_name", "") or "").strip()
+    drive_folder_url  = (body.get("drive_folder_url", "") or "").strip()
 
     # Validation
     errors = []
@@ -707,10 +716,27 @@ async def deal_won_modal_post(request: Request, deal_id: int):
         errors.append("Projektstartdatum ist Pflicht")
     if not delivery_owner:
         errors.append("Projektverantwortlicher ist Pflicht")
-    if not name:
-        errors.append("Projekt-Kurzname ist Pflicht")
+    # CRM-067: Drive-Ordner ist neues Pflichtfeld
+    if not drive_folder_id:
+        errors.append("Projekt-Ordner ist Pflicht (Drive-Picker)")
     if errors:
         return JSONResponse({"error": "; ".join(errors)}, status_code=422)
+
+    # CRM-067: Server-side Drive-Folder-Validation (mit Timeout-Schutz)
+    _drive_validation_warning = None
+    if drive_folder_id:
+        from app.shared.drive_auth import validate_folder as _validate_folder
+        _ok, _drive_meta = _validate_folder(user, drive_folder_id)
+        if not _ok:
+            _err = _drive_meta.get("error", "unknown")
+            if _err not in ("no_token", "drive_timeout"):
+                return JSONResponse(
+                    {"error": f"Drive-Ordner nicht zugreifbar: {_err}",
+                     "drive_error": f"Drive-Ordner nicht zugreifbar: {_err}"},
+                    status_code=422
+                )
+        elif _drive_meta.get("warning"):
+            _drive_validation_warning = _drive_meta["warning"]
 
     conn = get_connection()
     try:
@@ -725,7 +751,7 @@ async def deal_won_modal_post(request: Request, deal_id: int):
         deal = dict(row)
         old_stage = deal["stage"]
 
-        # Prüfen ob Projekt bereits existiert (CRM-059-Warnung bereits im Frontend)
+        # Pruefen ob Projekt bereits existiert (CRM-059-Warnung bereits im Frontend)
         existing_proj = conn.execute(
             "SELECT id, name FROM project WHERE deal_id=? AND deleted_at IS NULL", (deal_id,)
         ).fetchone()
@@ -740,6 +766,7 @@ async def deal_won_modal_post(request: Request, deal_id: int):
         # CRM-055: History-Eintrag
         log_stage_history(conn, deal_id, old_stage, "won", user, ts)
 
+        # Audit-Log #1: Deal UPDATE
         write_audit_log(conn, user=user, entity_type="deal", entity_id=deal_id,
                         action="UPDATE",
                         changed_fields={"stage": {"from": old_stage, "to": "won"},
@@ -751,15 +778,32 @@ async def deal_won_modal_post(request: Request, deal_id: int):
         project_id = None
         if not existing_proj:
             acv = angebotsbetrag if angebotsbetrag else deal.get("acv")
+            # CRM-067: name aus drive_folder_name
+            proj_name = drive_folder_name or drive_folder_id
             cur = conn.execute(
-                """INSERT INTO project (deal_id, name, delivery_owner, status, start_date, contract_value, created_at, updated_at)
-                   VALUES (?, ?, ?, 'active', ?, ?, ?, ?)""",
-                (deal_id, name, delivery_owner, projekt_start_datum, acv, ts, ts)
+                """INSERT INTO project (deal_id, name, delivery_owner, status, start_date,
+                                        contract_value, drive_folder_id, drive_folder_name,
+                                        drive_folder_url, created_at, updated_at)
+                   VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)""",
+                (deal_id, proj_name, delivery_owner, projekt_start_datum, acv,
+                 drive_folder_id, drive_folder_name, drive_folder_url, ts, ts)
             )
             project_id = cur.lastrowid
+
+            # Audit-Log #2: Project CREATE
             write_audit_log(conn, user=user, entity_type="project", entity_id=project_id,
                             action="CREATE",
-                            changed_fields={"deal_id": deal_id, "name": name},
+                            changed_fields={"deal_id": deal_id, "name": proj_name},
+                            ip_address=ip)
+
+            # Audit-Log #3: LINK_DRIVE (CRM-067 + CRM-070 ISO-Pflicht)
+            write_audit_log(conn, user=user, entity_type="project", entity_id=project_id,
+                            action="LINK_DRIVE",
+                            changed_fields={
+                                "drive_folder_id":   drive_folder_id,
+                                "drive_folder_name": drive_folder_name,
+                                "drive_folder_url":  drive_folder_url,
+                            },
                             ip_address=ip)
 
         conn.commit()
@@ -771,7 +815,7 @@ async def deal_won_modal_post(request: Request, deal_id: int):
     finally:
         conn.close()
 
-    # CRM-WON-CELEBRATION: Slack-Notification (Fire-and-forget)
+    # CRM-071: Slack-Notification mit Drive-Link (Fire-and-forget)
     try:
         from app.shared.slack_notifier import notify_won
         from app.db import get_connection as _gc
@@ -789,20 +833,25 @@ async def deal_won_modal_post(request: Request, deal_id: int):
             _conn2.commit()
         finally:
             _conn2.close()
+        # CRM-071: Drive-Link optional mitgeben
         notify_won(
             deal_titel=deal.get("titel", ""),
             owner=deal.get("owner", ""),
             unternehmen=deal.get("unternehmen_name") or "",
             acv=angebotsbetrag if angebotsbetrag else deal.get("acv"),
             products=_prods,
+            drive_folder_url=drive_folder_url or None,
+            drive_folder_name=drive_folder_name or None,
         )
     except Exception:
         pass  # Fire-and-forget
 
-    return JSONResponse({"ok": True, "stage": "won", "project_id": project_id})
+    resp = {"ok": True, "stage": "won", "project_id": project_id}
+    if _drive_validation_warning:
+        resp["drive_warning"] = _drive_validation_warning
+    return JSONResponse(resp)
 
 
-# ─── CRM-015: Projekt-Anlage nach Won ────────────────────────────────────────
 
 @router.get("/deals/{deal_id}/create-project", response_class=HTMLResponse)
 async def deal_create_project_form(request: Request, deal_id: int):

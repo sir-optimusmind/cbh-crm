@@ -15,6 +15,10 @@ Regeln:
 
 import os
 import json
+
+# CRM-066: Google Drive Picker Konfiguration
+GOOGLE_PICKER_API_KEY  = os.getenv("GOOGLE_PICKER_API_KEY", "")
+GOOGLE_PROJECT_NUMBER  = os.getenv("GOOGLE_PROJECT_NUMBER", "")
 from typing import Optional, List
 
 from fastapi import APIRouter, Request
@@ -212,6 +216,9 @@ async def _pipeline_kanban_view(request: Request, prefix: str, active_filters: l
         "products_filter": PRODUCTS_FILTER,
         "build_filter_url": build_filter_url,
         "saved_views": saved_views,
+        # CRM-066: Google Drive Picker Vars fuer Template-JS
+        "google_picker_api_key": GOOGLE_PICKER_API_KEY,
+        "google_project_number": GOOGLE_PROJECT_NUMBER,
     }))
 
 

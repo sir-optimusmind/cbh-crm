@@ -250,11 +250,33 @@
         <div class="won-field-error" id="err-owner" style="display:none; color:#FCA5A5; font-size:11px; margin-top:3px;"></div>
       </div>
       <div>
-        <label style="display:block; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; margin-bottom:5px;">Projekt-Kurzname <span style="color:#DC2626;">*</span></label>
-        <input type="text" id="won-name" name="name" required maxlength="60"
-          placeholder="z.B. Roche RACE 2026 Q3"
-          style="width:100%; box-sizing:border-box; background:#252525; border:1px solid #333; border-radius:6px; color:#F0F0F0; font-family:'Barlow',sans-serif; font-size:13px; padding:7px 10px; outline:none;">
-        <div class="won-field-error" id="err-name" style="display:none; color:#FCA5A5; font-size:11px; margin-top:3px;"></div>
+        <label style="display:block; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; margin-bottom:5px;">
+          Projekt-Ordner <span style="color:#DC2626;">*</span>
+        </label>
+        <!-- Picker-Button (sichtbar wenn kein Ordner gewaehlt) -->
+        <button type="button" id="drive-picker-btn"
+          style="width:100%; box-sizing:border-box; height:34px;
+                 background:#252525; border:1px solid #374151;
+                 border-radius:6px; color:#FFFB76;
+                 font-family:'Barlow',sans-serif; font-size:13px; font-weight:700;
+                 padding:7px 10px; cursor:pointer; display:flex; align-items:center;
+                 gap:8px; transition:background 0.1s, border-color 0.1s;"
+          onmouseover="this.style.background='rgba(255,251,118,0.08)'; this.style.borderColor='#FFFB76'"
+          onmouseout="this.style.background='#252525'; this.style.borderColor='#374151'">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M1.5 3A1.5 1.5 0 0 0 0 4.5v8A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H7.621a1.5 1.5 0 0 1-1.06-.44L5.5 3H1.5Z"/>
+          </svg>
+          Ordner waehlen
+        </button>
+        <!-- Pre-Selection-Block (versteckt bis Ordner gewaehlt) -->
+        <div id="drive-selection-block" style="display:none;"></div>
+        <!-- Versteckte Felder fuer Form-Submit -->
+        <input type="hidden" id="drive-folder-id"   name="drive_folder_id">
+        <input type="hidden" id="drive-folder-name" name="drive_folder_name">
+        <input type="hidden" id="drive-folder-url"  name="drive_folder_url">
+        <!-- Error-Anzeige -->
+        <div class="won-field-error" id="err-drive-folder"
+             style="display:none; color:#FCA5A5; font-size:11px; margin-top:3px;"></div>
       </div>
       <div style="grid-column:span 2;">
         <label style="display:block; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; margin-bottom:5px;">Angebotsbetrag (€)</label>
@@ -275,6 +297,44 @@
       </button>
     </div>
   </form>
+</dialog>
+
+<!-- CRM-069: Drive Auth Modal (erscheint wenn kein Google-Token vorhanden) -->
+<dialog id="drive-auth-modal"
+  style="margin:0; position:fixed; top:25vh; left:50%; transform:translateX(-50%);
+         width:440px; max-width:calc(100vw - 32px);
+         background:#1E1E1E; border:1px solid #333; border-radius:12px;
+         box-shadow:0 24px 64px rgba(0,0,0,0.65); padding:0; color:#F0F0F0; z-index:10005;">
+  <div style="padding:16px 20px; border-bottom:1px solid #2a2a2a;
+              display:flex; align-items:center; justify-content:space-between;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div style="width:10px; height:10px; border-radius:50%; background:#555;"></div>
+      <span style="font-size:15px; font-weight:700;">Google Drive verbinden</span>
+    </div>
+    <button type="button" id="drive-auth-cancel-x"
+      style="background:none; border:none; color:#666; font-size:18px;
+             cursor:pointer; padding:0 4px;">&times;</button>
+  </div>
+  <div style="padding:20px; font-family:'Barlow',sans-serif; font-size:13px;
+              color:#9CA3AF; line-height:1.6;">
+    Um Projekt-Ordner zu waehlen, musst du einmalig dein Google Drive verbinden.<br>
+    Du wirst kurz zu Google weitergeleitet und danach automatisch zurueck zum Won-Modal.
+  </div>
+  <div style="padding:12px 20px; border-top:1px solid #2a2a2a;
+              display:flex; justify-content:flex-end; gap:8px;">
+    <button type="button" id="drive-auth-cancel-btn"
+      style="padding:8px 16px; background:#252525; border:1px solid #333;
+             border-radius:6px; color:#aaa; font-family:'Barlow',sans-serif;
+             font-size:13px; font-weight:600; cursor:pointer;">
+      Abbrechen
+    </button>
+    <button type="button" id="drive-auth-connect-btn"
+      style="padding:8px 20px; background:#FFFB76; border:none; border-radius:6px;
+             color:#111; font-family:'Barlow',sans-serif; font-size:13px;
+             font-weight:700; cursor:pointer;">
+      Mit Google verbinden &rarr;
+    </button>
+  </div>
 </dialog>
 
 <!-- Lost-Modal (CRM-030): Verlustgrund bei Drag auf Lost-Spalte -->
@@ -362,6 +422,18 @@
   </form>
 </dialog>
 
+<!-- Google Picker API (CRM-066 Sprint 4) – lazy via gapi.load() -->
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiReady=true"></script>
+<!-- Picker-Konstanten aus Server-Config -->
+<script>
+var GOOGLE_PICKER_API_KEY = "{{ google_picker_api_key }}";
+var GOOGLE_PROJECT_NUMBER = "{{ google_project_number }}";
+var gapiReady = false;
+</script>
+<!-- Google Picker Z-Index fix (ueber dialog) -->
+<style>
+.picker-dialog, .picker-dialog-bg { z-index: 10001 !important; }
+</style>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 const PREFIX = "{{ prefix }}";
@@ -417,9 +489,171 @@ document.querySelectorAll('.kanban-col').forEach(function(col) {
 // ── Won-Modal Logik (CRM-060)
 var _wonDealId = null;
 
+// ── Drive Picker State (CRM-066 Sprint 4) ────────────────────────────────────
+var _pickerApiLoaded = false;
+var _pickerAccessToken = null;
+
+// Google Picker API laden (lazy)
+function loadPickerApi(callback) {
+  if (_pickerApiLoaded) { callback(); return; }
+  if (typeof gapi === 'undefined') {
+    setTimeout(function() { loadPickerApi(callback); }, 200);
+    return;
+  }
+  gapi.load('picker', function() { _pickerApiLoaded = true; callback(); });
+}
+
+// Picker-Token vom Backend holen
+function fetchPickerToken(callback) {
+  fetch(PREFIX + '/drive/picker-token')
+    .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
+    .then(function(res) {
+      if (res.status === 401 || res.data.requires_auth) {
+        var authModal = document.getElementById('drive-auth-modal');
+        if (authModal) authModal.showModal();
+        var btn = document.getElementById('drive-picker-btn');
+        if (btn) { btn.textContent = 'Ordner waehlen'; btn.disabled = false; btn.style.cursor = 'pointer'; btn.style.color = '#FFFB76'; }
+        return;
+      }
+      if (res.status !== 200 || !res.data.access_token) {
+        document.getElementById('err-drive-folder').textContent = 'Drive-Verbindung fehlgeschlagen. Seite neu laden.';
+        document.getElementById('err-drive-folder').style.display = 'block';
+        var btn = document.getElementById('drive-picker-btn');
+        if (btn) { btn.textContent = 'Ordner waehlen'; btn.disabled = false; btn.style.cursor = 'pointer'; btn.style.color = '#FFFB76'; }
+        return;
+      }
+      _pickerAccessToken = res.data.access_token;
+      callback(_pickerAccessToken);
+    })
+    .catch(function() {
+      document.getElementById('err-drive-folder').textContent = 'Netzwerkfehler.';
+      document.getElementById('err-drive-folder').style.display = 'block';
+      var btn = document.getElementById('drive-picker-btn');
+      if (btn) { btn.textContent = 'Ordner waehlen'; btn.disabled = false; btn.style.cursor = 'pointer'; btn.style.color = '#FFFB76'; }
+    });
+}
+
+// Picker oeffnen
+function openDrivePicker() {
+  var btn = document.getElementById('drive-picker-btn');
+  btn.textContent = 'Laden…';
+  btn.disabled = true;
+  btn.style.cursor = 'wait';
+  btn.style.color = '#6B7280';
+
+  fetchPickerToken(function(token) {
+    loadPickerApi(function() {
+      btn.textContent = 'Ordner waehlen';
+      btn.disabled = false;
+      btn.style.cursor = 'pointer';
+      btn.style.color = '#FFFB76';
+
+      var picker = new google.picker.PickerBuilder()
+        .addView(
+          new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+            .setSelectFolderEnabled(true)
+            .setMimeTypes('application/vnd.google-apps.folder')
+            .setIncludeFolders(true)
+            .setParent('root')
+        )
+        .addView(
+          new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+            .setSelectFolderEnabled(true)
+            .setEnableDrives(true)
+        )
+        .setOAuthToken(token)
+        .setDeveloperKey(GOOGLE_PICKER_API_KEY)
+        .setAppId(GOOGLE_PROJECT_NUMBER)
+        .setCallback(pickerCallback)
+        .setTitle('Projekt-Ordner waehlen')
+        .build();
+      picker.setVisible(true);
+    });
+  });
+}
+
+// Picker-Callback
+function pickerCallback(data) {
+  if (data.action === google.picker.Action.PICKED) {
+    var doc = data.docs[0];
+    document.getElementById('drive-folder-id').value   = doc.id;
+    document.getElementById('drive-folder-name').value = doc.name;
+    document.getElementById('drive-folder-url').value  = doc.url;
+
+    document.getElementById('drive-picker-btn').style.display = 'none';
+    document.getElementById('err-drive-folder').style.display = 'none';
+    document.getElementById('err-drive-folder').textContent   = '';
+
+    renderDriveSelection(doc.name, doc.url, doc.driveId);
+
+    document.getElementById('won-submit-btn').disabled      = false;
+    document.getElementById('won-submit-btn').style.opacity = '1';
+    document.getElementById('won-submit-btn').style.cursor  = 'pointer';
+  }
+  // CANCEL: kein State-Change
+}
+
+// Pre-Selection-Block rendern (Sarah CI Spec)
+function renderDriveSelection(folderName, folderUrl, driveId) {
+  var shortUrl = folderUrl.replace('https://', '').substring(0, 38) + (folderUrl.length > 38 ? '…' : '');
+  var isPersonal = !driveId;
+  var folderSvg = '<svg width="14" height="14" viewBox="0 0 16 16" fill="#FFFB76" aria-hidden="true" style="flex-shrink:0;"><path d="M1.5 3A1.5 1.5 0 0 0 0 4.5v8A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H7.621a1.5 1.5 0 0 1-1.06-.44L5.5 3H1.5Z"/></svg>';
+  var warnSvg = '<svg width="13" height="13" viewBox="0 0 16 16" fill="#F59E0B"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 11.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Zm.75-3.25a.75.75 0 0 1-1.5 0V5.75a.75.75 0 0 1 1.5 0v3.5Z"/></svg>';
+  var checkSvg = '<svg id="drive-valid-check" width="13" height="13" viewBox="0 0 16 16" fill="#22C55E" style="flex-shrink:0; display:none;"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>';
+
+  var html = '<div style="background:#252525; border:1px solid #1F2937; border-radius:6px; padding:8px 10px; box-sizing:border-box; width:100%;">';
+  html += '<div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">';
+  html += '<div style="display:flex; align-items:center; gap:8px; min-width:0;">';
+  html += folderSvg;
+  html += '<span style="font-family:'Barlow',sans-serif; font-size:13px; font-weight:700; color:#E5E7EB; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;" title="' + folderName + '">' + folderName + '</span>';
+  html += '</div>';
+  html += isPersonal ? warnSvg : checkSvg;
+  html += '</div>';
+  if (isPersonal) {
+    html += '<div style="font-size:11px; color:#F59E0B; margin-top:3px;">Pers&ouml;nlicher Drive – Team hat evtl. keinen Zugriff.</div>';
+  }
+  html += '<div style="margin-top:4px; display:flex; align-items:center; justify-content:space-between; gap:8px;">';
+  html += '<a href="' + folderUrl + '" target="_blank" rel="noopener noreferrer" style="font-size:11px; color:#9CA3AF; text-decoration:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">' + shortUrl + '</a>';
+  html += '<button type="button" onclick="changeDriveFolder()" style="background:none; border:none; padding:0; cursor:pointer; font-family:'Barlow',sans-serif; font-size:11px; font-weight:600; color:#6B7280; white-space:nowrap; flex-shrink:0;" onmouseover="this.style.color='#E5E7EB'" onmouseout="this.style.color='#6B7280'">&#196;ndern</button>';
+  html += '</div></div>';
+
+  var block = document.getElementById('drive-selection-block');
+  block.innerHTML = html;
+  block.style.display = 'block';
+}
+
+// "Aendern" Klick
+function changeDriveFolder() {
+  document.getElementById('drive-folder-id').value   = '';
+  document.getElementById('drive-folder-name').value = '';
+  document.getElementById('drive-folder-url').value  = '';
+  document.getElementById('drive-selection-block').style.display = 'none';
+  document.getElementById('drive-selection-block').innerHTML = '';
+  var btn = document.getElementById('drive-picker-btn');
+  btn.style.display = 'flex';
+  btn.style.borderColor = '#374151';
+  document.getElementById('won-submit-btn').disabled      = true;
+  document.getElementById('won-submit-btn').style.opacity = '0.5';
+  document.getElementById('won-submit-btn').style.cursor  = 'not-allowed';
+  openDrivePicker();
+}
+
+// Auth-Modal Events (CRM-069)
+document.getElementById('drive-auth-cancel-btn').addEventListener('click', function() {
+  document.getElementById('drive-auth-modal').close();
+});
+document.getElementById('drive-auth-cancel-x').addEventListener('click', function() {
+  document.getElementById('drive-auth-modal').close();
+});
+document.getElementById('drive-auth-connect-btn').addEventListener('click', function() {
+  window.location.href = PREFIX + '/auth/google/start?next=/pipeline';
+});
+
+// Picker-Button Event
+document.getElementById('drive-picker-btn').addEventListener('click', openDrivePicker);
+
 function openWonModal(dealId, card, fromCol, oldIndex) {
   _wonDealId = dealId;
-  // Pre-fill ACV from deal card data-acv attribute (CRM-BUG-004)
   var acvEl = document.getElementById('won-acv');
   var cardAcv = card ? card.dataset.acv : '';
   acvEl.value = cardAcv ? cardAcv : '';
@@ -427,10 +661,20 @@ function openWonModal(dealId, card, fromCol, oldIndex) {
   document.getElementById('won-unterschrift').value = '';
   document.getElementById('won-start').value = '';
   document.getElementById('won-owner').value = '';
-  document.getElementById('won-name').value = '';
+  // CRM-066: Drive-State reset
+  document.getElementById('drive-folder-id').value   = '';
+  document.getElementById('drive-folder-name').value = '';
+  document.getElementById('drive-folder-url').value  = '';
+  document.getElementById('drive-picker-btn').style.display = 'flex';
+  document.getElementById('drive-picker-btn').style.borderColor = '#374151';
+  document.getElementById('drive-selection-block').style.display = 'none';
+  document.getElementById('drive-selection-block').innerHTML = '';
   document.getElementById('won-global-error').style.display = 'none';
   document.querySelectorAll('.won-field-error').forEach(function(e) { e.style.display = 'none'; });
-  document.getElementById('won-submit-btn').disabled = false;
+  // Submit initial disabled (Drive-Ordner ist Pflichtfeld)
+  document.getElementById('won-submit-btn').disabled = true;
+  document.getElementById('won-submit-btn').style.opacity = '0.5';
+  document.getElementById('won-submit-btn').style.cursor = 'not-allowed';
   document.getElementById('won-submit-btn').textContent = '🚀 Abschliessen & feiern';
   document.getElementById('won-modal').showModal();
 }
@@ -448,7 +692,6 @@ document.getElementById('won-modal').addEventListener('cancel', function(e) {
   document.getElementById('won-modal').close();
   _wonDealId = null;
 });
-// ESC
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape' && document.getElementById('won-modal').open) {
     document.getElementById('won-modal').close();
@@ -458,14 +701,15 @@ document.addEventListener('keydown', function(e) {
 
 document.getElementById('won-form').addEventListener('submit', function(e) {
   e.preventDefault();
-  var unterschrift = document.getElementById('won-unterschrift').value;
-  var start = document.getElementById('won-start').value;
-  var owner = document.getElementById('won-owner').value;
-  var name = document.getElementById('won-name').value.trim();
-  var acv = document.getElementById('won-acv').value;
+  var unterschrift    = document.getElementById('won-unterschrift').value;
+  var start           = document.getElementById('won-start').value;
+  var owner           = document.getElementById('won-owner').value;
+  var driveFolderId   = document.getElementById('drive-folder-id').value.trim();
+  var driveFolderName = document.getElementById('drive-folder-name').value.trim();
+  var driveFolderUrl  = document.getElementById('drive-folder-url').value.trim();
+  var acv             = document.getElementById('won-acv').value;
   var valid = true;
 
-  // Validation
   if (!unterschrift) {
     document.getElementById('err-unterschrift').textContent = 'Pflichtfeld';
     document.getElementById('err-unterschrift').style.display = 'block';
@@ -481,9 +725,10 @@ document.getElementById('won-form').addEventListener('submit', function(e) {
     document.getElementById('err-owner').style.display = 'block';
     valid = false;
   }
-  if (!name) {
-    document.getElementById('err-name').textContent = 'Pflichtfeld';
-    document.getElementById('err-name').style.display = 'block';
+  if (!driveFolderId) {
+    document.getElementById('drive-picker-btn').style.borderColor = '#EF4444';
+    document.getElementById('err-drive-folder').textContent = 'Bitte Drive-Ordner waehlen';
+    document.getElementById('err-drive-folder').style.display = 'block';
     valid = false;
   }
   if (!valid) return;
@@ -496,11 +741,13 @@ document.getElementById('won-form').addEventListener('submit', function(e) {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      unterschrift_datum: unterschrift,
+      unterschrift_datum:  unterschrift,
       projekt_start_datum: start,
-      delivery_owner: owner,
-      name: name,
-      angebotsbetrag: acv ? parseFloat(acv) : null
+      delivery_owner:      owner,
+      drive_folder_id:     driveFolderId,
+      drive_folder_name:   driveFolderName,
+      drive_folder_url:    driveFolderUrl,
+      angebotsbetrag:      acv ? parseFloat(acv) : null
     })
   })
   .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
@@ -508,15 +755,20 @@ document.getElementById('won-form').addEventListener('submit', function(e) {
     if (res.status !== 200 || res.data.error) {
       document.getElementById('won-global-error').textContent = res.data.error || 'Fehler beim Speichern.';
       document.getElementById('won-global-error').style.display = 'block';
+      if (res.data.drive_error) {
+        var driveBlock = document.getElementById('drive-selection-block').firstElementChild;
+        if (driveBlock) driveBlock.style.border = '1px solid #EF4444';
+        document.getElementById('err-drive-folder').textContent = res.data.drive_error;
+        document.getElementById('err-drive-folder').style.display = 'block';
+      }
       submitBtn.disabled = false;
+      submitBtn.style.opacity = '1';
+      submitBtn.style.cursor = 'pointer';
       submitBtn.textContent = '🚀 Abschliessen & feiern';
     } else {
       document.getElementById('won-modal').close();
-      // Won-Celebration: Card animieren + Toast
       var celebCard = document.getElementById('card-' + _wonDealId);
-      if (celebCard) {
-        celebCard.classList.add('won-celebration');
-      }
+      if (celebCard) { celebCard.classList.add('won-celebration'); }
       showWonToast();
       _wonDealId = null;
       setTimeout(function() { window.location.reload(); }, 1200);
@@ -526,6 +778,8 @@ document.getElementById('won-form').addEventListener('submit', function(e) {
     document.getElementById('won-global-error').textContent = 'Netzwerkfehler.';
     document.getElementById('won-global-error').style.display = 'block';
     submitBtn.disabled = false;
+    submitBtn.style.opacity = '1';
+    submitBtn.style.cursor = 'pointer';
     submitBtn.textContent = '🚀 Abschliessen & feiern';
   });
 });

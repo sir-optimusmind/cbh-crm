@@ -48,6 +48,8 @@ def notify_won(
     unternehmen: str = "",
     acv=None,
     products: list = None,
+    drive_folder_url: str = None,
+    drive_folder_name: str = None,
 ) -> None:
     """
     Sendet eine zufaellige Won-Celebration-Nachricht an den CBH-Slack-Channel.
@@ -87,6 +89,18 @@ def notify_won(
             # Fallback: sichere Basisnachricht wenn Phrase unbekannte Variable hat
             logger.warning(f"[slack_notifier] Format-Fehler in Phrase: {e} – Fallback-Text")
             text = f"🚀 {owner_tag} hat *{deal_titel}* gewonnen!"
+
+        # CRM-071: Drive-Folder-Link wenn vorhanden
+        drive_link_text = ""
+        if drive_folder_url and drive_folder_name:
+            drive_link_text = f"
+<{drive_folder_url}|📁 {drive_folder_name}>"
+        elif drive_folder_url:
+            drive_link_text = f"
+<{drive_folder_url}|📁 Drive-Ordner>"
+
+        if drive_link_text:
+            text = text + drive_link_text
 
         payload = {
             "channel": channel,
