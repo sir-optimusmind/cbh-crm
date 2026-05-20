@@ -36,7 +36,7 @@
     'new': 'New',
     'discovery': 'Discovery',
     'proposal_sent': 'Proposal Sent',
-    'won': 'Won',
+    'won': '🚀 Won',
     'lost': 'Lost'
   } %}
 
@@ -185,7 +185,7 @@
     <div style="padding:16px 20px; border-bottom:1px solid #2a2a2a; display:flex; align-items:center; justify-content:space-between;">
       <div style="display:flex; align-items:center; gap:10px;">
         <div style="width:10px; height:10px; border-radius:50%; background:#34D399;"></div>
-        <span style="font-size:15px; font-weight:700;">Deal als Won abschliessen</span>
+        <span style="font-size:15px; font-weight:700;">🚀 Deal gewonnen!</span>
       </div>
       <button type="button" id="won-cancel-x" style="background:none; border:none; color:#666; font-size:18px; cursor:pointer; padding:0 4px;">&times;</button>
     </div>
@@ -237,7 +237,7 @@
       </button>
       <button type="submit" id="won-submit-btn"
         style="padding:8px 20px; background:#34D399; border:none; border-radius:6px; color:#111; font-family:'Barlow',sans-serif; font-size:13px; font-weight:700; cursor:pointer;">
-        Als Won abschliessen
+        🚀 Abschliessen &amp; feiern
       </button>
     </div>
   </form>
@@ -396,7 +396,7 @@ function openWonModal(dealId, card, fromCol, oldIndex) {
   document.getElementById('won-global-error').style.display = 'none';
   document.querySelectorAll('.won-field-error').forEach(function(e) { e.style.display = 'none'; });
   document.getElementById('won-submit-btn').disabled = false;
-  document.getElementById('won-submit-btn').textContent = 'Als Won abschliessen';
+  document.getElementById('won-submit-btn').textContent = '🚀 Abschliessen & feiern';
   document.getElementById('won-modal').showModal();
 }
 
@@ -474,18 +474,24 @@ document.getElementById('won-form').addEventListener('submit', function(e) {
       document.getElementById('won-global-error').textContent = res.data.error || 'Fehler beim Speichern.';
       document.getElementById('won-global-error').style.display = 'block';
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Als Won abschliessen';
+      submitBtn.textContent = '🚀 Abschliessen & feiern';
     } else {
       document.getElementById('won-modal').close();
+      // Won-Celebration: Card animieren + Toast
+      var celebCard = document.getElementById('card-' + _wonDealId);
+      if (celebCard) {
+        celebCard.classList.add('won-celebration');
+      }
+      showWonToast();
       _wonDealId = null;
-      window.location.reload();
+      setTimeout(function() { window.location.reload(); }, 1200);
     }
   })
   .catch(function() {
     document.getElementById('won-global-error').textContent = 'Netzwerkfehler.';
     document.getElementById('won-global-error').style.display = 'block';
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Als Won abschliessen';
+    submitBtn.textContent = '🚀 Abschliessen & feiern';
   });
 });
 
@@ -687,6 +693,19 @@ function resetFilters() {
   params.delete('produkt');
   params.set('page', '1');
   window.location.href = window.location.pathname + '?' + params.toString();
+}
+
+// ── Won-Celebration Toast ─────────────────────────────────────────────────
+function showWonToast() {
+  var existing = document.getElementById('won-toast');
+  if (existing) existing.remove();
+  var toast = document.createElement('div');
+  toast.id = 'won-toast';
+  toast.className = 'toast-won';
+  toast.style.cssText = 'position:fixed; bottom:24px; right:24px; z-index:9999; padding:12px 20px; border-radius:8px; border:1px solid #34D399; font-family:'Barlow',sans-serif; font-size:14px; font-weight:700; background:#052e16; color:#34D399; box-shadow:0 8px 24px rgba(0,0,0,0.5); animation:wonPulse 600ms ease-out forwards;';
+  toast.textContent = '🚀 Deal gewonnen! Slack-Notification raus.';
+  document.body.appendChild(toast);
+  setTimeout(function() { if (toast.parentNode) toast.remove(); }, 3000);
 }
 </script>
 {% endblock %}

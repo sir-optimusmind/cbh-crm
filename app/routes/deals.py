@@ -766,6 +766,34 @@ async def deal_won_modal_post(request: Request, deal_id: int):
     finally:
         conn.close()
 
+    # CRM-WON-CELEBRATION: Slack-Notification (Fire-and-forget)
+    try:
+        from app.shared.slack_notifier import notify_won
+        from app.db import get_connection as _gc
+        _conn2 = _gc()
+        try:
+            _prods = [p["product"] for p in _conn2.execute(
+                "SELECT product FROM deal_product WHERE deal_id=?", (deal_id,)
+            ).fetchall()]
+            _conn2.execute(
+                """INSERT INTO audit_log (user, entity_type, entity_id, action, changed_fields, ip_address, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (user, "slack_notify", deal_id, "WON_CELEBRATION",
+                 str({"deal_id": deal_id, "channel": "C0B5DBN1E2U"}), ip, __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat())
+            )
+            _conn2.commit()
+        finally:
+            _conn2.close()
+        notify_won(
+            deal_titel=deal.get("titel", ""),
+            owner=deal.get("owner", ""),
+            unternehmen=deal.get("unternehmen_name") or "",
+            acv=angebotsbetrag if angebotsbetrag else deal.get("acv"),
+            products=_prods,
+        )
+    except Exception:
+        pass  # Fire-and-forget
+
     return JSONResponse({"ok": True, "stage": "won", "project_id": project_id})
 
 
