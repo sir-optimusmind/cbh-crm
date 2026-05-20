@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Funnel Report – CBH CRM{% endblock %}
+{% block content %}
+<div id="funnel-page" style="background:var(--bg-base,#1E1E1E); min-height:100vh; padding:0;">
+
+  <!-- Page-Header -->
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px;">
+    <div>
+      <h1 style="font-size:20px; font-weight:700; margin:0 0 4px 0; color:#E5E7EB; font-family:'Barlow Semi Condensed',sans-serif; text-transform:uppercase; letter-spacing:0.08em;">Funnel Report</h1>
+      <div style="font-size:12px; color:#6B7280;">CRM-057 | Conversion-Rates aus echter Stage-History</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <!-- Zeitraum-Filter -->
+      <select class="select-input" name="zeitraum"
+              onchange="window.location.href='{{ prefix }}/pipeline/funnel?zeitraum=' + this.value"
+              style="font-size:12px; padding:6px 10px; background:#252525; border:1px solid #374151; border-radius:6px; color:#E5E7EB; cursor:pointer;">
+        <option value="all"  {% if zeitraum=='all'  %}selected{% endif %}>Gesamt</option>
+        <option value="30d"  {% if zeitraum=='30d'  %}selected{% endif %}>Letzte 30 Tage</option>
+        <option value="90d"  {% if zeitraum=='90d'  %}selected{% endif %}>Letzte 90 Tage</option>
+        <option value="q1"   {% if zeitraum=='q1'   %}selected{% endif %}>Q1 2026</option>
+        <option value="q2"   {% if zeitraum=='q2'   %}selected{% endif %}>Q2 2026</option>
+      </select>
+      <a href="{{ prefix }}/pipeline" class="btn-secondary btn-sm">&larr; Pipeline</a>
+    </div>
+  </div>
+
+  {% if not has_history_data %}
+  <!-- Leerer State (CRM-057 Spec) -->
+  <div class="funnel-empty">
+    <div class="funnel-empty__icon">&#9672;</div>
+    <div class="funnel-empty__title">Conversion-Daten werden gesammelt.</div>
+    <div class="funnel-empty__hint">Verfügbar ab 5 Stage-Bewegungen. Derzeit: {{ history_count }} / 5 erfasst.</div>
+  </div>
+  {% else %}
+
+  <!-- Funnel-Visualisierung (horizontal, HubSpot-Style) -->
+  <div style="overflow-x:auto; padding-bottom:16px;">
+    <div style="display:flex; align-items:center; min-width:max-content; gap:0;">
+      {% for item in funnel_stages %}
+      <div class="funnel-stage" style="min-height:{{ [100, 80 + item.count * 2] | min }}px;">
+        <div class="funnel-stage__label">{{ item.label }}</div>
+        <div class="funnel-stage__count">{{ item.count }}</div>
+        {% if item.vol > 0 %}
+        <div class="funnel-stage__volume">€{{ "{:,.0f}".format(item.vol) }}</div>
+        {% endif %}
+        {% if item.dwell_days is not none %}
+        <div class="funnel-stage__dwell">Ø {{ item.dwell_days|int }} Tage</div>
+        {% endif %}
+      </div>
+      {% if not loop.last and item.cvr_to_next is not none %}
+      <div class="funnel-cvr {{ item.cvr_class }}">→{{ item.cvr_to_next|int }}%</div>
+      {% elif not loop.last %}
+      <div class="funnel-cvr funnel-cvr--empty">–</div>
+      {% endif %}
+      {% endfor %}
+
+      <!-- Won-Block -->
+      {% set won_data = stage_counts.get('won', {'count': 0, 'vol': 0}) %}
+      <div style="width:48px; display:flex; align-items:center; justify-content:center; font-size:18px; color:#34D399;">&#10003;</div>
+      <div class="funnel-stage" style="border-color:#34D399; min-height:100px;">
+        <div class="funnel-stage__label" style="color:#34D399;">WON</div>
+        <div class="funnel-stage__count" style="color:#34D399;">{{ won_data.count }}</div>
+        {% if won_data.vol > 0 %}
+        <div class="funnel-stage__volume">€{{ "{:,.0f}".format(won_data.vol) }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Lost-Breakdown -->
+  {% if lost_reasons %}
+  <div class="lost-breakdown">
+    <div style="font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.12em; color:#6B7280; margin-bottom:16px;">Lost-Analyse ({{ total_lost }} Deals)</div>
+    {% for reason in lost_reasons %}
+    <div class="lost-bar-row">
+      <div class="lost-bar-label">{{ reason.label }}</div>
+      <div class="lost-bar-track">
+        <div class="lost-bar-fill" style="width:{{ reason.pct }}%;"></div>
+      </div>
+      <div class="lost-bar-meta">{{ reason.pct|int }}% ({{ reason.count }})</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="margin-top:40px; padding:24px; border:1px dashed #374151; border-radius:6px; text-align:center; color:#6B7280; font-size:13px;">
+    Noch keine Lost-Deals mit strukturiertem Verlustgrund. Lost-Reason-Dropdown (CRM-054) aktiv.
+  </div>
+  {% endif %}
+
+  {% endif %}
+</div>
+{% endblock %}

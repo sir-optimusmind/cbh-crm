@@ -23,6 +23,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.db import get_connection, write_audit_log, now_iso
 from app.template_utils import tmpl_ctx
+from app.shared.cvr import get_cvr_matrix, cvr_pct, get_cvr_label_class, invalidate_cvr_cache
 
 router = APIRouter()
 _TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
@@ -170,18 +171,14 @@ async def _pipeline_kanban_view(request: Request, prefix: str, active_filters: l
                     "acv_sum": acv_sum,
                 }
 
-        # CVR: Tech-Debt-Note bleibt bis CRM-056 historische Daten hat
-        # Nach CRM-055-Daten-Sammlung wird hier shared/cvr.py verwendet
+        # CRM-056: Historische CVR aus deal_stage_history (Niko N2, direkter Uebergang)
+        cvr_matrix = get_cvr_matrix()
         active_stages = ["opportunity", "new", "discovery", "proposal_sent"]
         for i, stage in enumerate(active_stages):
             next_stage = active_stages[i + 1] if i + 1 < len(active_stages) else "won"
-            curr_count = stages_data[stage]["count"]
-            next_count = stages_data[next_stage]["count"]
-            if curr_count > 0:
-                raw_cvr = round(next_count / curr_count * 100, 0)
-                stages_data[stage]["cvr"] = min(raw_cvr, 100)
-            else:
-                stages_data[stage]["cvr"] = 0
+            rate = cvr_pct(stage, next_stage)
+            stages_data[stage]["cvr"] = rate
+            stages_data[stage]["cvr_class"] = get_cvr_label_class(rate)
 
         stages_data["won"]["cvr"] = None
         stages_data["won"]["ytd_label"] = True
@@ -353,6 +350,108 @@ async def pipeline_lost_all(request: Request):
         "prefix": prefix,
         "lost_deals": lost_deals,
         "total": len(lost_deals),
+    }))
+
+
+
+# ─── GET /pipeline/funnel (CRM-057) ──────────────────────────────────────────
+
+@router.get("/pipeline/funnel", response_class=HTMLResponse)
+async def pipeline_funnel(request: Request):
+    """CRM-057: Funnel-Report-Page mit CVR, Verweildauer, Lost-Breakdown."""
+    prefix = request.scope.get("root_path", "")
+    zeitraum = request.query_params.get("zeitraum", "all")
+
+    conn = get_connection()
+    try:
+        # History-Daten vorhanden?
+        history_count = conn.execute(
+            "SELECT COUNT(*) as cnt FROM deal_stage_history"
+        ).fetchone()["cnt"]
+        has_history_data = history_count >= 5
+
+        # Deal-Counts pro Stage
+        stage_rows = conn.execute(
+            """SELECT stage, COUNT(*) as cnt, COALESCE(SUM(acv),0) as vol
+               FROM deal WHERE deleted_at IS NULL GROUP BY stage"""
+        ).fetchall()
+        stage_counts = {r["stage"]: {"count": r["cnt"], "vol": r["vol"]} for r in stage_rows}
+
+        # Zeitraum-Filter fuer Verweildauer-Abfrage
+        ts_filter = ""
+        if zeitraum == "30d":
+            ts_filter = "AND moved_at >= datetime('now', '-30 days')"
+        elif zeitraum == "90d":
+            ts_filter = "AND moved_at >= datetime('now', '-90 days')"
+        elif zeitraum == "q1":
+            ts_filter = "AND moved_at >= '2026-01-01' AND moved_at < '2026-04-01'"
+        elif zeitraum == "q2":
+            ts_filter = "AND moved_at >= '2026-04-01' AND moved_at < '2026-07-01'"
+
+        # Durchschnittliche Verweildauer pro Stage
+        dwell_rows = conn.execute(f"""
+            SELECT h1.from_stage as stage,
+                   AVG(julianday(h2.moved_at) - julianday(h1.moved_at)) as avg_days
+            FROM deal_stage_history h1
+            JOIN deal_stage_history h2 ON h2.deal_id = h1.deal_id
+                AND h2.id = (
+                    SELECT MIN(id) FROM deal_stage_history
+                    WHERE deal_id = h1.deal_id AND id > h1.id
+                )
+            WHERE h1.from_stage IS NOT NULL {ts_filter}
+            GROUP BY h1.from_stage
+        """).fetchall()
+        dwell = {r["stage"]: round(r["avg_days"], 0) if r["avg_days"] else None for r in dwell_rows}
+
+        # Lost-Breakdown nach verlust_reason_enum
+        lost_enum_rows = conn.execute(
+            """SELECT verlust_reason_enum, COUNT(*) as cnt
+               FROM deal WHERE stage='lost' AND deleted_at IS NULL
+               GROUP BY verlust_reason_enum ORDER BY cnt DESC"""
+        ).fetchall()
+        total_lost = sum(r["cnt"] for r in lost_enum_rows)
+        lost_reasons = []
+        for r in lost_enum_rows:
+            pct = round(100.0 * r["cnt"] / total_lost, 0) if total_lost > 0 else 0
+            lost_reasons.append({
+                "label": r["verlust_reason_enum"] or "Ohne Angabe",
+                "count": r["cnt"],
+                "pct": pct,
+            })
+
+    finally:
+        conn.close()
+
+    # CVR-Matrix (aus Cache)
+    cvr_matrix = get_cvr_matrix()
+
+    # Stages fuer Funnel aufbauen
+    funnel_stages = []
+    for i, stage in enumerate(["opportunity", "new", "discovery", "proposal_sent", "won"]):
+        stage_info = stage_counts.get(stage, {"count": 0, "vol": 0})
+        next_stage = ["opportunity", "new", "discovery", "proposal_sent", "won"][i+1] if i < 4 else None
+        rate = cvr_pct(stage, next_stage) if next_stage else None
+        funnel_stages.append({
+            "stage": stage,
+            "label": stage.replace("_", " ").title(),
+            "count": stage_info["count"],
+            "vol": stage_info["vol"],
+            "dwell_days": dwell.get(stage),
+            "cvr_to_next": rate,
+            "cvr_class": get_cvr_label_class(rate),
+            "next_stage": next_stage,
+        })
+
+    return templates.TemplateResponse(request, "pipeline_funnel.html", tmpl_ctx(request, {
+        "request": request,
+        "prefix": prefix,
+        "has_history_data": has_history_data,
+        "history_count": history_count,
+        "funnel_stages": funnel_stages,
+        "lost_reasons": lost_reasons,
+        "total_lost": total_lost,
+        "zeitraum": zeitraum,
+        "stage_counts": stage_counts,
     }))
 
 

@@ -23,6 +23,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.db import get_connection, write_audit_log, now_iso
 from app.shared.stage_history import log_stage_history
+from app.shared.cvr import invalidate_cvr_cache
 from app.template_utils import tmpl_ctx
 
 router = APIRouter()
@@ -611,10 +612,12 @@ async def deal_stage_patch(request: Request, deal_id: int):
         deal = dict(row)
         old_stage = deal["stage"]
 
-        if old_stage in ("won", "lost"):
+        # CRM-059: Won↔Lost umschiebbar (beide Richtungen erlaubt)
+        # Andere Quell-Stages bleiben gesperrt fuer Direktwechsel zu Won (via Modal CRM-060)
+        if old_stage in ("won", "lost") and new_stage not in ("won", "lost"):
             conn.rollback()
             return JSONResponse(
-                {"error": "Finalisierte Deals können nicht per Drag&Drop verschoben werden"},
+                {"error": "Finalisierte Deals können nur zwischen Won/Lost verschoben werden"},
                 status_code=422
             )
 
@@ -652,6 +655,8 @@ async def deal_stage_patch(request: Request, deal_id: int):
                         changed_fields={"stage": {"from": old_stage, "to": new_stage}},
                         ip_address=ip)
         conn.commit()
+        # CRM-056: CVR-Cache nach Stage-Wechsel invalidieren (Niko N2-Empfehlung)
+        invalidate_cvr_cache()
     except Exception as e:
         conn.rollback()
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -669,6 +674,99 @@ async def deal_stage_patch(request: Request, deal_id: int):
             return JSONResponse({"redirect": f"{prefix}/deals/{deal_id}/create-project"}, status_code=200)
 
     return JSONResponse({"ok": True, "stage": new_stage}, status_code=200)
+
+
+
+# ─── CRM-060: Won-Modal POST (Projekt-Anlage direkt ueber Kanban) ─────────────
+
+@router.post("/deals/{deal_id}/won-modal")
+async def deal_won_modal_post(request: Request, deal_id: int):
+    """CRM-060: Won-Abschluss via Modal (kein Page-Wechsel).
+    Body: JSON mit unterschrift_datum, projekt_start_datum, delivery_owner, name, angebotsbetrag"""
+    prefix = request.scope.get("root_path", "")
+    user = get_user(request)
+    ip = get_client_ip(request)
+
+    body = await request.json()
+    unterschrift_datum = body.get("unterschrift_datum", "").strip()
+    projekt_start_datum = body.get("projekt_start_datum", "").strip()
+    delivery_owner = body.get("delivery_owner", "").strip()
+    name = body.get("name", "").strip()
+    angebotsbetrag = body.get("angebotsbetrag")
+
+    # Validation
+    errors = []
+    if not unterschrift_datum:
+        errors.append("Unterschriftsdatum ist Pflicht")
+    if not projekt_start_datum:
+        errors.append("Projektstartdatum ist Pflicht")
+    if not delivery_owner:
+        errors.append("Projektverantwortlicher ist Pflicht")
+    if not name:
+        errors.append("Projekt-Kurzname ist Pflicht")
+    if errors:
+        return JSONResponse({"error": "; ".join(errors)}, status_code=422)
+
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+
+        row = conn.execute(
+            "SELECT * FROM deal WHERE id=? AND deleted_at IS NULL", (deal_id,)
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            return JSONResponse({"error": "Deal nicht gefunden"}, status_code=404)
+        deal = dict(row)
+        old_stage = deal["stage"]
+
+        # Prüfen ob Projekt bereits existiert (CRM-059-Warnung bereits im Frontend)
+        existing_proj = conn.execute(
+            "SELECT id, name FROM project WHERE deal_id=? AND deleted_at IS NULL", (deal_id,)
+        ).fetchone()
+
+        ts = now_iso()
+        # Stage auf Won setzen
+        conn.execute(
+            "UPDATE deal SET stage='won', unterschrift_datum=?, projekt_start_datum=?, updated_at=? WHERE id=?",
+            (unterschrift_datum, projekt_start_datum, ts, deal_id)
+        )
+
+        # CRM-055: History-Eintrag
+        log_stage_history(conn, deal_id, old_stage, "won", user, ts)
+
+        write_audit_log(conn, user=user, entity_type="deal", entity_id=deal_id,
+                        action="UPDATE",
+                        changed_fields={"stage": {"from": old_stage, "to": "won"},
+                                        "unterschrift_datum": unterschrift_datum,
+                                        "projekt_start_datum": projekt_start_datum},
+                        ip_address=ip)
+
+        # Projekt anlegen (wenn noch nicht vorhanden)
+        project_id = None
+        if not existing_proj:
+            acv = angebotsbetrag if angebotsbetrag else deal.get("acv")
+            cur = conn.execute(
+                """INSERT INTO project (deal_id, name, delivery_owner, status, start_date, contract_value, created_at, updated_at)
+                   VALUES (?, ?, ?, 'active', ?, ?, ?, ?)""",
+                (deal_id, name, delivery_owner, projekt_start_datum, acv, ts, ts)
+            )
+            project_id = cur.lastrowid
+            write_audit_log(conn, user=user, entity_type="project", entity_id=project_id,
+                            action="CREATE",
+                            changed_fields={"deal_id": deal_id, "name": name},
+                            ip_address=ip)
+
+        conn.commit()
+        invalidate_cvr_cache()
+
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        conn.close()
+
+    return JSONResponse({"ok": True, "stage": "won", "project_id": project_id})
 
 
 # ─── CRM-015: Projekt-Anlage nach Won ────────────────────────────────────────

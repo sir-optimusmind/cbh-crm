@@ -76,8 +76,12 @@
         <span>€{{ "{:,.0f}".format(sd.acv_sum) }}</span>
         {% endif %}
       </div>
-      {% if stage not in ('won', 'lost') and sd.cvr is not none %}
-      <div style="font-size:11px; color:#777; margin-top:2px;">CVR → {{ sd.cvr|int }}%</div>
+      {# CRM-056: Historische CVR aus deal_stage_history #}
+      {% if stage not in ('won', 'lost') %}
+      <div style="font-size:11px; margin-top:2px;"
+           class="{{ sd.cvr_class if sd.cvr_class else 'funnel-cvr--empty' }}">
+        {% if sd.cvr is not none %}CVR → {{ sd.cvr }}%{% else %}CVR –{% endif %}
+      </div>
       {% endif %}
     </div>
 
@@ -170,6 +174,74 @@
 {% endblock %}
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+
+<!-- Won-Modal (CRM-060): Projekt-Anlage direkt ueber Kanban -->
+<dialog id="won-modal"
+  style="margin:0; position:fixed; top:20vh; left:50%; transform:translateX(-50%);
+         width:520px; max-width:calc(100vw - 32px);
+         background:#1E1E1E; border:1px solid #333; border-radius:12px;
+         box-shadow:0 24px 64px rgba(0,0,0,0.65); padding:0; color:#F0F0F0;">
+  <form id="won-form" method="dialog" style="display:flex; flex-direction:column;">
+    <div style="padding:16px 20px; border-bottom:1px solid #2a2a2a; display:flex; align-items:center; justify-content:space-between;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:10px; height:10px; border-radius:50%; background:#34D399;"></div>
+        <span style="font-size:15px; font-weight:700;">Deal als Won abschliessen</span>
+      </div>
+      <button type="button" id="won-cancel-x" style="background:none; border:none; color:#666; font-size:18px; cursor:pointer; padding:0 4px;">&times;</button>
+    </div>
+    <div style="padding:20px; display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+      <div>
+        <label style="display:block; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; margin-bottom:5px;">Unterschriftsdatum <span style="color:#DC2626;">*</span></label>
+        <input type="date" id="won-unterschrift" name="unterschrift_datum" required
+          style="width:100%; box-sizing:border-box; background:#252525; border:1px solid #333; border-radius:6px; color:#F0F0F0; font-family:'Barlow',sans-serif; font-size:13px; padding:7px 10px; outline:none;">
+        <div class="won-field-error" id="err-unterschrift" style="display:none; color:#FCA5A5; font-size:11px; margin-top:3px;"></div>
+      </div>
+      <div>
+        <label style="display:block; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; margin-bottom:5px;">Projektstartdatum <span style="color:#DC2626;">*</span></label>
+        <input type="date" id="won-start" name="projekt_start_datum" required
+          style="width:100%; box-sizing:border-box; background:#252525; border:1px solid #333; border-radius:6px; color:#F0F0F0; font-family:'Barlow',sans-serif; font-size:13px; padding:7px 10px; outline:none;">
+        <div class="won-field-error" id="err-start" style="display:none; color:#FCA5A5; font-size:11px; margin-top:3px;"></div>
+      </div>
+      <div>
+        <label style="display:block; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; margin-bottom:5px;">Projektverantwortlicher <span style="color:#DC2626;">*</span></label>
+        <select id="won-owner" name="delivery_owner" required
+          style="width:100%; box-sizing:border-box; background:#252525; border:1px solid #333; border-radius:6px; color:#F0F0F0; font-family:'Barlow',sans-serif; font-size:13px; padding:7px 10px; outline:none; cursor:pointer;">
+          <option value="">-- Wählen --</option>
+          <option value="christian">Christian</option>
+          <option value="andre">Andre</option>
+          <option value="michi">Michi</option>
+          <option value="marco">Marco</option>
+          <option value="tim">Tim</option>
+        </select>
+        <div class="won-field-error" id="err-owner" style="display:none; color:#FCA5A5; font-size:11px; margin-top:3px;"></div>
+      </div>
+      <div>
+        <label style="display:block; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; margin-bottom:5px;">Projekt-Kurzname <span style="color:#DC2626;">*</span></label>
+        <input type="text" id="won-name" name="name" required maxlength="60"
+          placeholder="z.B. Roche RACE 2026 Q3"
+          style="width:100%; box-sizing:border-box; background:#252525; border:1px solid #333; border-radius:6px; color:#F0F0F0; font-family:'Barlow',sans-serif; font-size:13px; padding:7px 10px; outline:none;">
+        <div class="won-field-error" id="err-name" style="display:none; color:#FCA5A5; font-size:11px; margin-top:3px;"></div>
+      </div>
+      <div style="grid-column:span 2;">
+        <label style="display:block; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; margin-bottom:5px;">Angebotsbetrag (€)</label>
+        <input type="number" id="won-acv" name="angebotsbetrag" step="1000" min="0"
+          style="width:100%; box-sizing:border-box; background:#252525; border:1px solid #333; border-radius:6px; color:#FFFB76; font-family:'JetBrains Mono',monospace; font-size:13px; padding:7px 10px; outline:none;">
+        <div style="font-size:10px; color:#555; margin-top:3px;">Pre-filled aus Deal-Volumen (editierbar)</div>
+      </div>
+    </div>
+    <div id="won-global-error" style="display:none; margin:0 20px 12px; color:#FCA5A5; font-size:12px; background:rgba(220,38,38,0.1); padding:8px 12px; border-radius:6px;"></div>
+    <div style="padding:12px 20px; border-top:1px solid #2a2a2a; display:flex; justify-content:flex-end; gap:8px;">
+      <button type="button" id="won-cancel-btn"
+        style="padding:8px 16px; background:#252525; border:1px solid #333; border-radius:6px; color:#aaa; font-family:'Barlow',sans-serif; font-size:13px; font-weight:600; cursor:pointer;">
+        Abbrechen
+      </button>
+      <button type="submit" id="won-submit-btn"
+        style="padding:8px 20px; background:#34D399; border:none; border-radius:6px; color:#111; font-family:'Barlow',sans-serif; font-size:13px; font-weight:700; cursor:pointer;">
+        Als Won abschliessen
+      </button>
+    </div>
+  </form>
+</dialog>
 
 <!-- Lost-Modal (CRM-030): Verlustgrund bei Drag auf Lost-Spalte -->
 <dialog id="lost-modal"
@@ -289,10 +361,9 @@ document.querySelectorAll('.kanban-col').forEach(function(col) {
       if (newStage === oldStage) return;
 
       if (newStage === 'won') {
-        // Karte zurueck (visuell) – Redirect zur Projekt-Anlage-Form
+        // CRM-060: Won-Modal direkt ueber Kanban (kein Page-Wechsel)
         evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);
-        // Won: Stage wird durch Projekt-Form gesetzt (CRM-015)
-        window.location.href = PREFIX + '/deals/' + dealId + '/create-project';
+        openWonModal(dealId, card, evt.from, evt.oldIndex);
         return;
       }
 
@@ -306,6 +377,115 @@ document.querySelectorAll('.kanban-col').forEach(function(col) {
       // Regulaerer Stage-Wechsel (Drag zwischen aktiven Spalten)
       patchStage(dealId, newStage, card, evt.from, evt.oldIndex, null);
     }
+  });
+});
+
+// ── Won-Modal Logik (CRM-060)
+var _wonDealId = null;
+
+function openWonModal(dealId, card, fromCol, oldIndex) {
+  _wonDealId = dealId;
+  // Pre-fill ACV
+  var acvEl = document.getElementById('won-acv');
+  // (ACV pre-fill via separate data-attribute would need server-side; leave empty for now)
+  // Reset fields
+  document.getElementById('won-unterschrift').value = '';
+  document.getElementById('won-start').value = '';
+  document.getElementById('won-owner').value = '';
+  document.getElementById('won-name').value = '';
+  document.getElementById('won-global-error').style.display = 'none';
+  document.querySelectorAll('.won-field-error').forEach(function(e) { e.style.display = 'none'; });
+  document.getElementById('won-submit-btn').disabled = false;
+  document.getElementById('won-submit-btn').textContent = 'Als Won abschliessen';
+  document.getElementById('won-modal').showModal();
+}
+
+document.getElementById('won-cancel-btn').addEventListener('click', function() {
+  document.getElementById('won-modal').close();
+  _wonDealId = null;
+});
+document.getElementById('won-cancel-x').addEventListener('click', function() {
+  document.getElementById('won-modal').close();
+  _wonDealId = null;
+});
+document.getElementById('won-modal').addEventListener('cancel', function(e) {
+  e.preventDefault();
+  document.getElementById('won-modal').close();
+  _wonDealId = null;
+});
+// ESC
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('won-modal').open) {
+    document.getElementById('won-modal').close();
+    _wonDealId = null;
+  }
+});
+
+document.getElementById('won-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var unterschrift = document.getElementById('won-unterschrift').value;
+  var start = document.getElementById('won-start').value;
+  var owner = document.getElementById('won-owner').value;
+  var name = document.getElementById('won-name').value.trim();
+  var acv = document.getElementById('won-acv').value;
+  var valid = true;
+
+  // Validation
+  if (!unterschrift) {
+    document.getElementById('err-unterschrift').textContent = 'Pflichtfeld';
+    document.getElementById('err-unterschrift').style.display = 'block';
+    valid = false;
+  }
+  if (!start) {
+    document.getElementById('err-start').textContent = 'Pflichtfeld';
+    document.getElementById('err-start').style.display = 'block';
+    valid = false;
+  }
+  if (!owner) {
+    document.getElementById('err-owner').textContent = 'Pflichtfeld';
+    document.getElementById('err-owner').style.display = 'block';
+    valid = false;
+  }
+  if (!name) {
+    document.getElementById('err-name').textContent = 'Pflichtfeld';
+    document.getElementById('err-name').style.display = 'block';
+    valid = false;
+  }
+  if (!valid) return;
+
+  var submitBtn = document.getElementById('won-submit-btn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Speichern...';
+
+  fetch(PREFIX + '/deals/' + _wonDealId + '/won-modal', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      unterschrift_datum: unterschrift,
+      projekt_start_datum: start,
+      delivery_owner: owner,
+      name: name,
+      angebotsbetrag: acv ? parseFloat(acv) : null
+    })
+  })
+  .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
+  .then(function(res) {
+    if (res.status !== 200 || res.data.error) {
+      document.getElementById('won-global-error').textContent = res.data.error || 'Fehler beim Speichern.';
+      document.getElementById('won-global-error').style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Als Won abschliessen';
+    } else {
+      document.getElementById('won-modal').close();
+      _wonDealId = null;
+      window.location.reload();
+    }
+  })
+  .catch(function() {
+    document.getElementById('won-global-error').textContent = 'Netzwerkfehler.';
+    document.getElementById('won-global-error').style.display = 'block';
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Als Won abschliessen';
   });
 });
 
