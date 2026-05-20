@@ -8,12 +8,13 @@
 </div>
 
 
-<!-- Owner Pill-Bar (CRM-031) -->
+<!-- Owner Pill-Bar (CRM-031) – Fix: eigener Name ausgeblendet wenn eingeloggt -->
 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
   {%- set _q = q or '' -%}
   {%- set _s = stimmung_filter or '' -%}
   {%- set _lk = letzter_kontakt_filter or '' -%}
   {%- macro owner_url(o) -%}{{ prefix }}/personen?q={{ _q }}&stimmung={{ _s }}&letzter_kontakt={{ _lk }}&owner={{ o }}{%- endmacro -%}
+  {%- set current_first_name = (current_user.name or '').split()[0] | lower if current_user and current_user.name else '' -%}
   <a href="{{ owner_url('') }}"
      style="display:inline-block; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600; text-decoration:none; border:2px solid transparent;
             {% if not owner_filter %}border-bottom-color:#FFFB76; color:#FFFB76; background:rgba(255,251,118,0.08);{% else %}color:#aaa; background:rgba(255,255,255,0.04);{% endif %}">
@@ -25,11 +26,13 @@
     Meine
   </a>
   {% for o in owners %}
+  {%- if o | lower != current_first_name %}
   <a href="{{ owner_url(o) }}"
      style="display:inline-block; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600; text-decoration:none; border:2px solid transparent; text-transform:capitalize;
             {% if owner_filter == o %}border-bottom-color:#FFFB76; color:#FFFB76; background:rgba(255,251,118,0.08);{% else %}color:#aaa; background:rgba(255,255,255,0.04);{% endif %}">
     {{ o | capitalize }}
   </a>
+  {%- endif %}
   {% endfor %}
 </div>
 
@@ -70,7 +73,7 @@
   </form>
 </div>
 
-<!-- Personen-Tabelle -->
+<!-- Personen-Tabelle – Fix: Row klickbar, Detail/Edit-Buttons entfernt -->
 <div class="card" style="padding:0; overflow:hidden;">
   {% if personen %}
   <table>
@@ -83,16 +86,18 @@
         <th>Letzter Kontakt</th>
         <th>Primäre Firma</th>
         <th>Owner</th>
-        <th style="width:120px;"></th>
       </tr>
     </thead>
     <tbody>
       {% for p in personen %}
-      <tr>
+      <tr style="cursor:pointer;"
+          onclick="window.location='{{ prefix }}/personen/{{ p.id }}'"
+          onmouseover="this.style.background='rgba(255,255,255,0.04)'"
+          onmouseout="this.style.background=''">
         <td>
-          <a href="{{ prefix }}/personen/{{ p.id }}" style="color:#FFFB76; text-decoration:none; font-weight:600;">
+          <span style="color:#FFFB76; font-weight:600;">
             {{ p.vorname }} {{ p.nachname }}
-          </a>
+          </span>
         </td>
         <td style="color:#aaa;">{{ p.email or '–' }}</td>
         <td>{{ p.position or '–' }}</td>
@@ -109,17 +114,15 @@
         <td style="color:#aaa; font-size:12px;">{{ p.last_contact_at[:10] if p.last_contact_at else '–' }}</td>
         <td>
           {% if p.primary_company_name %}
-          <a href="{{ prefix }}/unternehmen/{{ p.primary_company_id }}" style="color:#5870E2; text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ p.primary_company_name }}</a>
+          <a href="{{ prefix }}/unternehmen/{{ p.primary_company_id }}" style="color:#5870E2; text-decoration:none;"
+             onclick="event.stopPropagation()"
+             onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ p.primary_company_name }}</a>
           {% else %}–{% endif %}
         </td>
         <td>
           {% if p.created_by %}
           <span class="badge badge-blue">{{ p.created_by }}</span>
           {% else %}–{% endif %}
-        </td>
-        <td style="text-align:right;">
-          <a href="{{ prefix }}/personen/{{ p.id }}" class="btn-secondary btn-sm">Detail</a>
-          <a href="{{ prefix }}/personen/{{ p.id }}/edit" class="btn-secondary btn-sm" style="margin-left:4px;">Edit</a>
         </td>
       </tr>
       {% endfor %}

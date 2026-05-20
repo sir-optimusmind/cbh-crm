@@ -2,7 +2,7 @@
 {% block title %}Pipeline – CBH CRM{% endblock %}
 {% block content %}
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-  <h1 style="font-size:22px; font-weight:700; margin:0;">Pipeline-Kanban</h1>
+  <h1 style="font-size:22px; font-weight:700; margin:0;">Deal Pipeline</h1>
   <div style="display:flex; gap:8px;">
     <a href="{{ prefix }}/pipeline/stages" class="btn-secondary btn-sm">Stage-Definitionen</a>
     <a href="{{ prefix }}/deals/new" class="btn-primary btn-sm">+ Neuer Deal</a>
@@ -30,8 +30,21 @@
       {% elif stage == 'opportunity' %}#FB923C
       {% elif stage == 'proposal_sent' %}#5870E2
       {% else %}#555{% endif %}; margin-bottom:2px;">
-      <div style="font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#F0F0F0; margin-bottom:4px;">
-        {{ stage_labels[stage] }}
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <span style="font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#F0F0F0;">
+          {{ stage_labels[stage] }}
+        </span>
+        {%- if stage not in ('won', 'lost') %}
+        <a href="{{ prefix }}/deals/new?stage={{ stage }}"
+           title="Neuer Deal in {{ stage_labels[stage] }}"
+           onclick="event.stopPropagation()"
+           style="display:flex; align-items:center; justify-content:center;
+                  width:20px; height:20px; border-radius:4px;
+                  color:#FFFB76; text-decoration:none; font-size:16px; font-weight:700; line-height:1;
+                  background:rgba(255,251,118,0.08);"
+           onmouseover="this.style.background='rgba(255,251,118,0.2)'"
+           onmouseout="this.style.background='rgba(255,251,118,0.08)'">+</a>
+        {%- endif %}
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#aaa;">
         <span>{{ sd.count }} Deal{% if sd.count != 1 %}s{% endif %}</span>

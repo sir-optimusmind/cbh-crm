@@ -177,8 +177,10 @@ async def deals_liste(
 # ─── CRM-010: Deal anlegen (Formular) ────────────────────────────────────────
 
 @router.get("/deals/new", response_class=HTMLResponse)
-async def deal_new_form(request: Request):
+async def deal_new_form(request: Request, stage: str = ""):
     prefix = request.scope.get("root_path", "")
+    # stage Query-Param: pre-fill Stage wenn vom Pipeline-Header-Plus-Button aufgerufen
+    preselected_stage = stage if stage in STAGES else "new"
     conn = get_connection()
     try:
         personen = conn.execute(
@@ -203,6 +205,7 @@ async def deal_new_form(request: Request):
         "lead_types": LEAD_TYPES,
         "icp_personas": ICP_PERSONAS,
         "selected_products": [],
+        "preselected_stage": preselected_stage,
     }))
 
 

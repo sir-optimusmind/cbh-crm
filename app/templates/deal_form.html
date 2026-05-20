@@ -36,7 +36,7 @@
           <label>Stage *</label>
           <select name="stage" id="stage-select" onchange="updateConditionalFields(this.value)">
             {% for s in stages %}
-            <option value="{{ s }}" {% if (deal and deal.stage == s) or (not deal and s == 'new') %}selected{% endif %}>
+            <option value="{{ s }}" {% if (deal and deal.stage == s) or (not deal and preselected_stage is defined and s == preselected_stage) or (not deal and preselected_stage is not defined and s == 'new') %}selected{% endif %}>
               {{ s|replace('_',' ')|capitalize }}
             </option>
             {% endfor %}
