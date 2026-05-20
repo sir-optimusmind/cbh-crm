@@ -40,6 +40,13 @@ _ALLOWLIST_USERS = [
     {"email": "tim@cbh.ai",        "name": "Tim",       "full_name": "Tim",              "slug": "tim"},
 ]
 
+# Display-Namen-Overrides (Spitznamen / Kurzform)
+# Key = user_id / slug aus crm_user-Tabelle
+_DISPLAY_NAME_OVERRIDES = {
+    "christian": "Christian",   # Zingg weglassen
+    "michael":   "Michi",        # Spitzname, Avatar-File heisst michi.png
+}
+
 # ─── NAV_ITEMS ────────────────────────────────────────────────────────────────
 # Reihenfolge = Sidebar-Reihenfolge
 # key: eindeutiger Bezeichner fuer Active-State
@@ -146,8 +153,14 @@ def get_all_users(db_conn, current_email: str, prefix: str = "") -> list[dict]:
             continue
         seen_slugs.add(slug)
 
-        name = row["name"] or slug.capitalize()
-        parts = name.split()
+        raw_name = row["name"] or slug.capitalize()
+        # Display-Name-Override (Spitzname / Kurzform) hat Vorrang
+        if slug in _DISPLAY_NAME_OVERRIDES:
+            name = _DISPLAY_NAME_OVERRIDES[slug]
+        else:
+            # Nur Vorname anzeigen
+            name = raw_name.split()[0] if raw_name else slug.capitalize()
+        parts = raw_name.split()
         if len(parts) >= 2:
             initials = parts[0][0].upper() + parts[-1][0].upper()
         elif parts:
