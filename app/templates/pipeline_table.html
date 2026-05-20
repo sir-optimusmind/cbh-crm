@@ -55,7 +55,7 @@
     <tbody>
       {% for deal in deals %}
       <tr class="deal-row" onclick="window.location.href='{{ prefix }}/deals/{{ deal.id }}'">
-        <td class="td-name">{{ deal.name or '–' }}</td>
+        <td class="td-name">{{ deal.titel or '–' }}</td>
         <td>{{ deal.unternehmen_name or '–' }}</td>
         <td><span class="badge" style="font-size:10px; padding:2px 6px; background:rgba(255,251,118,0.1); color:#FFFB76; border-radius:3px;">{{ deal.stage | upper }}</span></td>
         <td>{{ deal.owner or '–' }}</td>

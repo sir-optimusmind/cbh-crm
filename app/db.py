@@ -29,6 +29,7 @@ _MIGRATION_006 = Path(__file__).parent.parent / "migrations" / "005_presence.sql
 _MIGRATION_007 = Path(__file__).parent.parent / "migrations" / "006_stage_history.sql"
 _MIGRATION_008 = Path(__file__).parent.parent / "migrations" / "007_verlust_reason_enum.sql"
 _MIGRATION_009 = Path(__file__).parent.parent / "migrations" / "008_saved_view.sql"
+_MIGRATION_010 = Path(__file__).parent.parent / "migrations" / "009_lost_competitor.sql"
 
 
 def get_connection() -> sqlite3.Connection:
@@ -274,6 +275,17 @@ def _run_migration_saved_view(conn: sqlite3.Connection) -> None:
 
 
 
+def _run_migration_lost_competitor(conn: sqlite3.Connection) -> None:
+    """
+    Migration 009: lost_competitor Spalte in deal.
+    CRM-BUG-006 | Sprint 3 Wave 3b.
+    Idempotent via _column_exists.
+    """
+    if not _column_exists(conn, "deal", "lost_competitor"):
+        conn.execute("ALTER TABLE deal ADD COLUMN lost_competitor TEXT")
+        conn.commit()
+
+
 def init_db() -> None:
     """
     Legt alle Tabellen an falls noch nicht vorhanden.
@@ -295,6 +307,7 @@ def init_db() -> None:
         _run_migration_stage_history(conn)
         _run_migration_verlust_enum(conn)
         _run_migration_saved_view(conn)
+        _run_migration_lost_competitor(conn)
     finally:
         conn.close()
 

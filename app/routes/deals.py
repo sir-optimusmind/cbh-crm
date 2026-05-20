@@ -590,6 +590,8 @@ async def deal_stage_patch(request: Request, deal_id: int):
     verlust_grund_body = body.get("verlust_grund", None)
     # CRM-054: strukturierter Verlustgrund (Enum)
     verlust_reason_enum_body = body.get("verlust_reason_enum", None)
+    # CRM-BUG-006: Wettbewerber-Feld persistieren
+    lost_competitor_body = body.get("lost_competitor", None)
     # Validation: nur erlaubte Enum-Werte
     if verlust_reason_enum_body is not None and verlust_reason_enum_body not in VERLUST_REASON_ENUM:
         return JSONResponse({"error": f"Ungültiger verlust_reason_enum-Wert: {verlust_reason_enum_body}"}, status_code=422)
@@ -636,10 +638,10 @@ async def deal_stage_patch(request: Request, deal_id: int):
 
         ts = now_iso()
         if new_stage == "lost":
-            # CRM-030 + CRM-054: verlust_grund + verlust_reason_enum persistieren
+            # CRM-030 + CRM-054 + CRM-BUG-006: verlust_grund + verlust_reason_enum + lost_competitor persistieren
             conn.execute(
-                "UPDATE deal SET stage=?, verlust_grund=?, verlust_reason_enum=?, updated_at=? WHERE id=?",
-                (new_stage, effective_verlust_grund, verlust_reason_enum_body, ts, deal_id)
+                "UPDATE deal SET stage=?, verlust_grund=?, verlust_reason_enum=?, lost_competitor=?, updated_at=? WHERE id=?",
+                (new_stage, effective_verlust_grund, verlust_reason_enum_body, lost_competitor_body, ts, deal_id)
             )
         else:
             conn.execute(
@@ -650,9 +652,12 @@ async def deal_stage_patch(request: Request, deal_id: int):
         # CRM-055: History-Eintrag in DERSELBEN Transaktion (atomar)
         log_stage_history(conn, deal_id, old_stage, new_stage, user, ts)
 
+        _changed = {"stage": {"from": old_stage, "to": new_stage}}
+        if new_stage == "lost" and lost_competitor_body:
+            _changed["lost_competitor"] = lost_competitor_body
         write_audit_log(conn, user=user, entity_type="deal", entity_id=deal_id,
                         action="UPDATE",
-                        changed_fields={"stage": {"from": old_stage, "to": new_stage}},
+                        changed_fields=_changed,
                         ip_address=ip)
         conn.commit()
         # CRM-056: CVR-Cache nach Stage-Wechsel invalidieren (Niko N2-Empfehlung)

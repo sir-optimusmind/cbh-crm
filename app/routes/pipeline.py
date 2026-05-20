@@ -34,7 +34,7 @@ PRODUCTS_FILTER = ["RACE", "EmpowerOS", "Innovation Cell", "OKR", "PM-Training",
 
 # Spalten-Config fuer Tabellen-Ansicht (CRM-052)
 TABLE_COLUMNS = [
-    {"key": "name",           "label": "Name",          "sortable": True},
+    {"key": "titel",           "label": "Name",          "sortable": True},
     {"key": "unternehmen",    "label": "Unternehmen",   "sortable": True},
     {"key": "stage",          "label": "Stage",         "sortable": True},
     {"key": "owner",          "label": "Owner",         "sortable": True},
@@ -48,7 +48,7 @@ TABLE_COLUMNS = [
 ]
 
 SORT_FIELD_MAP = {
-    "name": "d.name",
+    "titel": "d.titel",
     "unternehmen": "u.name",
     "stage": "d.stage",
     "owner": "d.owner",

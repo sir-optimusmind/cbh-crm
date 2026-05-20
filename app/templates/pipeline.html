@@ -95,6 +95,7 @@
       <div class="deal-card"
         data-id="{{ deal.id }}"
         data-stage="{{ deal.stage }}"
+        data-acv="{{ deal.acv or "" }}"
         data-draggable="true"
         id="card-{{ deal.id }}">
 
@@ -173,7 +174,6 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
 <!-- Won-Modal (CRM-060): Projekt-Anlage direkt ueber Kanban -->
 <dialog id="won-modal"
@@ -346,7 +346,7 @@ document.querySelectorAll('.kanban-col').forEach(function(col) {
   new Sortable(col, {
     group: {
       name: 'pipeline',
-      pull: isTerminal ? false : true,   // Terminal-Cols geben keine Karten raus
+      pull: true,                         // CRM-059: Won<->Lost Drag in beide Richtungen erlaubt
       put: true                           // ALLE Cols nehmen Karten an
     },
     animation: 150,
@@ -385,9 +385,10 @@ var _wonDealId = null;
 
 function openWonModal(dealId, card, fromCol, oldIndex) {
   _wonDealId = dealId;
-  // Pre-fill ACV
+  // Pre-fill ACV from deal card data-acv attribute (CRM-BUG-004)
   var acvEl = document.getElementById('won-acv');
-  // (ACV pre-fill via separate data-attribute would need server-side; leave empty for now)
+  var cardAcv = card ? card.dataset.acv : '';
+  acvEl.value = cardAcv ? cardAcv : '';
   // Reset fields
   document.getElementById('won-unterschrift').value = '';
   document.getElementById('won-start').value = '';
@@ -702,7 +703,7 @@ function showWonToast() {
   var toast = document.createElement('div');
   toast.id = 'won-toast';
   toast.className = 'toast-won';
-  toast.style.cssText = 'position:fixed; bottom:24px; right:24px; z-index:9999; padding:12px 20px; border-radius:8px; border:1px solid #34D399; font-family:'Barlow',sans-serif; font-size:14px; font-weight:700; background:#052e16; color:#34D399; box-shadow:0 8px 24px rgba(0,0,0,0.5); animation:wonPulse 600ms ease-out forwards;';
+  toast.style.cssText = "position:fixed; bottom:24px; right:24px; z-index:9999; padding:12px 20px; border-radius:8px; border:1px solid #34D399; font-family:'Barlow',sans-serif; font-size:14px; font-weight:700; background:#052e16; color:#34D399; box-shadow:0 8px 24px rgba(0,0,0,0.5); animation:wonPulse 600ms ease-out forwards;";
   toast.textContent = '🚀 Deal gewonnen! Slack-Notification raus.';
   document.body.appendChild(toast);
   setTimeout(function() { if (toast.parentNode) toast.remove(); }, 3000);

@@ -26,7 +26,7 @@
     <tbody>
       {% for deal in lost_deals %}
       <tr onclick="window.location.href='{{ prefix }}/deals/{{ deal.id }}'">
-        <td class="td-name">{{ deal.name or '–' }}</td>
+        <td class="td-name">{{ deal.titel or '–' }}</td>
         <td>{{ deal.unternehmen_name or '–' }}</td>
         <td class="td-acv">{% if deal.acv %}€{{ "{:,.0f}".format(deal.acv) }}{% else %}–{% endif %}</td>
         <td class="td-date">{{ deal.updated_at[:10] if deal.updated_at else '–' }}</td>
