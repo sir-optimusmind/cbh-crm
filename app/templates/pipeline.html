@@ -1,13 +1,33 @@
 {% extends "base.html" %}
 {% block title %}Pipeline – CBH CRM{% endblock %}
 {% block content %}
-<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-  <h1 style="font-size:22px; font-weight:700; margin:0;">Deal Pipeline</h1>
-  <div style="display:flex; gap:8px;">
-    <a href="{{ prefix }}/pipeline/stages" class="btn-secondary btn-sm">Stage-Definitionen</a>
-    <a href="{{ prefix }}/deals/new" class="btn-primary btn-sm">+ Neuer Deal</a>
+<!-- CRM-051 + CRM-053: Pipeline-Header mit Toggle + Filter-Bar -->
+<div id="pipeline-header" style="background:#111111; margin:-16px -16px 0 -16px; padding:0;">
+  <div style="display:flex; align-items:center; padding:0 16px; height:52px; border-bottom:1px solid #1F2937;">
+    <div class="view-toggle" role="group" style="margin-right:16px;">
+      <button class="view-toggle-btn {% if view_mode == 'kanban' %}view-toggle-btn--active{% endif %}" onclick="setView('kanban')" title="Kanban">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="4" height="12" rx="1"/><rect x="6" y="2" width="4" height="12" rx="1"/><rect x="11" y="2" width="4" height="12" rx="1"/></svg>
+      </button>
+      <button class="view-toggle-btn {% if view_mode == 'table' %}view-toggle-btn--active{% endif %}" onclick="setView('table')" title="Tabelle">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2" rx="1"/><rect x="1" y="6" width="14" height="2" rx="1"/><rect x="1" y="10" width="14" height="2" rx="1"/><rect x="1" y="14" width="14" height="2" rx="1"/></svg>
+      </button>
+    </div>
+    <span style="font-family:'Barlow Semi Condensed',sans-serif; font-size:18px; font-weight:700; color:#E5E7EB; flex:1;">Deal Pipeline</span>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <a href="{{ prefix }}/pipeline/funnel" style="font-size:12px; font-weight:600; color:#6B7280; text-decoration:none; white-space:nowrap;">Funnel Report &rarr;</a>
+      <a href="{{ prefix }}/pipeline/stages" class="btn-secondary btn-sm">Stage-Definitionen</a>
+      <a href="{{ prefix }}/deals/new" class="btn-primary btn-sm">+ Neuer Deal</a>
+    </div>
+  </div>
+  <div class="filter-bar" id="product-filter-bar">
+    {% for product in products_filter %}
+    <button class="filter-chip {% if product in active_filters %}filter-chip--active{% endif %}" onclick="toggleFilter('{{ product }}')" type="button">{{ product | upper }}</button>
+    {% endfor %}
+    {% if active_filters | length >= 2 %}<span class="filter-count">{{ active_filters | length }} aktiv</span>{% endif %}
+    <button class="filter-reset" {% if not active_filters %}style="display:none"{% endif %} onclick="resetFilters()" type="button">Alle anzeigen</button>
   </div>
 </div>
+<div style="height:16px;"></div>
 
 <!-- Kanban Board -->
 <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:12px; overflow-x:auto; min-width:900px;">
@@ -127,6 +147,16 @@
 
       {% if sd.count == 0 %}
       <div style="color:#444; font-size:12px; text-align:center; padding:20px 8px; font-style:italic;">Keine Deals</div>
+      {% endif %}
+      {# CRM-058: Lost-Spalte max 10, "Alle anzeigen"-Link #}
+      {% if stage == 'lost' and sd.has_more %}
+      <div style="text-align:center; padding:8px 0; border-top:1px solid #2a2a2a; margin-top:4px;">
+        <a href="{{ prefix }}/pipeline/lost"
+           style="font-size:11px; font-weight:600; color:#FFFB76; text-decoration:none; display:block; padding:6px 0;"
+           onclick="event.stopPropagation()">
+          Alle {{ sd.count }} Lost-Deals anzeigen
+        </a>
+      </div>
       {% endif %}
     </div>
   </div>
@@ -433,6 +463,50 @@ function clearCardError(card) {
   var errEl = card.querySelector('.card-error');
   errEl.style.display = 'none';
   card.classList.remove('dragging-error');
+}
+
+// ── CRM-051: View Toggle (localStorage + URL)
+function setView(mode) {
+  localStorage.setItem('crm_view', mode);
+  var params = new URLSearchParams(window.location.search);
+  params.set('view', mode);
+  // Preserve active filters
+  window.location.href = window.location.pathname + '?' + params.toString();
+}
+
+// On page load: if no view param, restore from localStorage
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  if (!params.has('view')) {
+    var saved = localStorage.getItem('crm_view');
+    if (saved && saved !== 'kanban') {
+      params.set('view', saved);
+      window.location.replace(window.location.pathname + '?' + params.toString());
+    }
+  }
+})();
+
+// ── CRM-053: Filter Toggle
+function toggleFilter(product) {
+  var params = new URLSearchParams(window.location.search);
+  var current = params.getAll('produkt');
+  var idx = current.indexOf(product);
+  params.delete('produkt');
+  if (idx === -1) {
+    current.push(product);
+  } else {
+    current.splice(idx, 1);
+  }
+  current.forEach(function(p) { params.append('produkt', p); });
+  params.set('page', '1');
+  window.location.href = window.location.pathname + '?' + params.toString();
+}
+
+function resetFilters() {
+  var params = new URLSearchParams(window.location.search);
+  params.delete('produkt');
+  params.set('page', '1');
+  window.location.href = window.location.pathname + '?' + params.toString();
 }
 </script>
 {% endblock %}

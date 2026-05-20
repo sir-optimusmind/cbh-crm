@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Lost Deals – CBH CRM{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <div>
+    <h1 style="font-size:20px; font-weight:700; margin:0 0 4px 0; color:#E5E7EB;">Lost Deals</h1>
+    <div style="font-size:12px; color:#6B7280;">{{ total }} Deals gesamt</div>
+  </div>
+  <a href="{{ prefix }}/pipeline" class="btn-secondary btn-sm">&larr; Zurück zur Pipeline</a>
+</div>
+
+<div class="table-wrapper">
+  {% if lost_deals %}
+  <table class="deals-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Unternehmen</th>
+        <th>Volumen</th>
+        <th>Lost-Datum</th>
+        <th>Verlustgrund</th>
+        <th>Freitext</th>
+        <th>Owner</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for deal in lost_deals %}
+      <tr onclick="window.location.href='{{ prefix }}/deals/{{ deal.id }}'">
+        <td class="td-name">{{ deal.name or '–' }}</td>
+        <td>{{ deal.unternehmen_name or '–' }}</td>
+        <td class="td-acv">{% if deal.acv %}€{{ "{:,.0f}".format(deal.acv) }}{% else %}–{% endif %}</td>
+        <td class="td-date">{{ deal.updated_at[:10] if deal.updated_at else '–' }}</td>
+        <td>{{ deal.verlust_reason_enum or '–' }}</td>
+        <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ deal.verlust_grund or '' }}">{{ deal.verlust_grund or '–' }}</td>
+        <td>{{ deal.owner or '–' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="table-empty-state">
+    <div class="table-empty-state__icon">—</div>
+    <div class="table-empty-state__text">Keine Lost Deals vorhanden.</div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
