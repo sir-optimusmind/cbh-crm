@@ -54,16 +54,6 @@
       {% endif %}
       {% endfor %}
 
-      <!-- Won-Block -->
-      {% set won_data = stage_counts.get('won', {'count': 0, 'vol': 0}) %}
-      <div style="width:48px; display:flex; align-items:center; justify-content:center; font-size:18px; color:#34D399;">&#10003;</div>
-      <div class="funnel-stage" style="border-color:#34D399; min-height:100px;">
-        <div class="funnel-stage__label" style="color:#34D399;">WON</div>
-        <div class="funnel-stage__count" style="color:#34D399;">{{ won_data.count }}</div>
-        {% if won_data.vol > 0 %}
-        <div class="funnel-stage__volume">€{{ "{:,.0f}".format(won_data.vol) }}</div>
-        {% endif %}
-      </div>
     </div>
   </div>
 

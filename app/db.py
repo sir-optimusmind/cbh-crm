@@ -286,6 +286,54 @@ def _run_migration_lost_competitor(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
+
+
+def _run_migration_projekte_polish(conn: sqlite3.Connection) -> None:
+    """
+    Migration 011: Projekte-Polish – project_rechnung Tabelle,
+    project.risiko_status, project.phase, touchpoint.project_id.
+    CRM-072 + CRM-073 | Sprint 4 | 2026-05-20.
+    Idempotent via _table_exists + _column_exists.
+    """
+    _MIGRATION_011 = Path(__file__).parent.parent / "migrations" / "011_projekte_polish.sql"
+
+    # project_rechnung Tabelle anlegen
+    if not _table_exists(conn, "project_rechnung"):
+        if _MIGRATION_011.exists():
+            conn.executescript(_MIGRATION_011.read_text(encoding="utf-8"))
+            conn.commit()
+        else:
+            conn.execute("""CREATE TABLE IF NOT EXISTS project_rechnung (
+              id          INTEGER PRIMARY KEY AUTOINCREMENT,
+              project_id  INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+              datum       TEXT    NOT NULL,
+              betrag      REAL    NOT NULL,
+              notiz       TEXT,
+              status      TEXT    NOT NULL DEFAULT 'offen'
+                          CHECK(status IN ('offen','bezahlt','storniert')),
+              created_at  TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ','now'))
+            )""")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_rechnung_project ON project_rechnung(project_id)")
+            conn.commit()
+
+    # project.risiko_status
+    if not _column_exists(conn, "project", "risiko_status"):
+        conn.execute("ALTER TABLE project ADD COLUMN risiko_status TEXT "
+                     "CHECK(risiko_status IN ('gruen','gelb','rot') OR risiko_status IS NULL)")
+        conn.commit()
+
+    # project.phase
+    if not _column_exists(conn, "project", "phase"):
+        conn.execute("ALTER TABLE project ADD COLUMN phase TEXT "
+                     "CHECK(phase IN ('kick_off','in_arbeit','review','abgeschlossen') OR phase IS NULL)")
+        conn.commit()
+
+    # touchpoint.project_id (CRM-073)
+    if not _column_exists(conn, "touchpoint", "project_id"):
+        conn.execute("ALTER TABLE touchpoint ADD COLUMN project_id INTEGER REFERENCES project(id) ON DELETE SET NULL")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_touchpoint_project ON touchpoint(project_id)")
+        conn.commit()
+
 def init_db() -> None:
     """
     Legt alle Tabellen an falls noch nicht vorhanden.
@@ -308,6 +356,7 @@ def init_db() -> None:
         _run_migration_verlust_enum(conn)
         _run_migration_saved_view(conn)
         _run_migration_lost_competitor(conn)
+        _run_migration_projekte_polish(conn)
     finally:
         conn.close()
 

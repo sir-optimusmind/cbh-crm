@@ -15,6 +15,40 @@
     <span style="font-family:'Barlow Semi Condensed',sans-serif; font-size:18px; font-weight:700; color:#E5E7EB; flex:1;">Deal Pipeline</span>
     <div style="display:flex; align-items:center; gap:12px;">
       <a href="{{ prefix }}/pipeline/funnel" style="font-size:12px; font-weight:600; color:#6B7280; text-decoration:none; white-space:nowrap;">Funnel Report &rarr;</a>
+      <!-- Saved Views Dropdown (BUG-007) -->
+      <div class="saved-views-dropdown" id="sv-dropdown">
+        <button class="btn-secondary btn-sm" onclick="document.getElementById('sv-menu').classList.toggle('hidden');" type="button" style="display:flex; align-items:center; gap:6px;">
+          &#128204; Ansichten
+        </button>
+        <div class="saved-views-menu hidden" id="sv-menu">
+          <div class="sv-section-label">Ansicht speichern</div>
+          <button class="sv-item" onclick="openSaveViewModal();" type="button">+ Aktuelle Ansicht speichern&hellip;</button>
+          {% if saved_views %}
+          <div class="sv-divider"></div>
+          <div class="sv-section-label">Gespeicherte Ansichten</div>
+          {% for sv in saved_views %}
+          <button class="sv-item" onclick="loadSavedView({{ sv.query_json | tojson }});" type="button" title="{{ sv.name }}">
+            {{ sv.name }}
+          </button>
+          {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+      <!-- Save View Modal (BUG-007) -->
+      <div id="sv-modal" style="display:none; position:fixed; inset:0; z-index:500; background:rgba(0,0,0,0.6); align-items:center; justify-content:center;">
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:24px; width:360px; max-width:90vw;">
+          <div style="font-size:14px; font-weight:700; color:var(--text-primary); margin-bottom:16px;">Ansicht speichern</div>
+          <div class="form-group">
+            <label class="required">Name</label>
+            <input type="text" id="sv-name-input" placeholder="z.B. Offene Deals Christian" maxlength="80">
+          </div>
+          <div style="display:flex; gap:8px; margin-top:12px;">
+            <button class="btn-primary btn-sm" onclick="saveSavedView();" type="button">Speichern</button>
+            <button class="btn-secondary btn-sm" onclick="closeSaveViewModal();" type="button">Abbrechen</button>
+          </div>
+          <div id="sv-error" style="margin-top:8px; font-size:12px; color:var(--status-error); display:none;"></div>
+        </div>
+      </div>
       <a href="{{ prefix }}/pipeline/stages" class="btn-secondary btn-sm">Stage-Definitionen</a>
       <a href="{{ prefix }}/deals/new" class="btn-primary btn-sm">+ Neuer Deal</a>
     </div>
@@ -707,6 +741,79 @@ function showWonToast() {
   toast.textContent = '🚀 Deal gewonnen! Slack-Notification raus.';
   document.body.appendChild(toast);
   setTimeout(function() { if (toast.parentNode) toast.remove(); }, 3000);
+}
+</script>
+<script>
+// Saved Views UI (BUG-007)
+function openSaveViewModal() {
+  document.getElementById('sv-menu').classList.add('hidden');
+  var modal = document.getElementById('sv-modal');
+  modal.style.display = 'flex';
+  document.getElementById('sv-name-input').focus();
+  document.getElementById('sv-error').style.display = 'none';
+}
+function closeSaveViewModal() {
+  document.getElementById('sv-modal').style.display = 'none';
+  document.getElementById('sv-name-input').value = '';
+}
+function buildCurrentQueryJson() {
+  // Sammle aktive Filter aus URL-Parametern + active_filters
+  var params = new URLSearchParams(window.location.search);
+  var q = {};
+  params.forEach(function(v, k) { if (v) q[k] = v; });
+  // View-Mode
+  var viewMode = document.querySelector('.view-toggle-btn--active');
+  if (viewMode) q['view_mode'] = viewMode.getAttribute('onclick').includes('kanban') ? 'kanban' : 'table';
+  return q;
+}
+function saveSavedView() {
+  var name = document.getElementById('sv-name-input').value.trim();
+  var errEl = document.getElementById('sv-error');
+  if (!name) { errEl.textContent = 'Name ist Pflicht.'; errEl.style.display = 'block'; return; }
+  var queryJson = buildCurrentQueryJson();
+  fetch('{{ prefix }}/pipeline/saved-views', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ name: name, query_json: queryJson, view_type: 'kanban' })
+  }).then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
+  .then(function(res) {
+    if (res.status === 201) {
+      closeSaveViewModal();
+      window.location.reload();
+    } else {
+      errEl.textContent = res.data.error || 'Fehler beim Speichern.';
+      errEl.style.display = 'block';
+    }
+  }).catch(function(e) { errEl.textContent = 'Netzwerkfehler.'; errEl.style.display = 'block'; });
+}
+function loadSavedView(queryJson) {
+  document.getElementById('sv-menu').classList.add('hidden');
+  var params = new URLSearchParams();
+  if (typeof queryJson === 'string') { try { queryJson = JSON.parse(queryJson); } catch(e) {} }
+  Object.keys(queryJson || {}).forEach(function(k) { if (queryJson[k]) params.set(k, queryJson[k]); });
+  window.location.href = '{{ prefix }}/pipeline?' + params.toString();
+}
+// Close dropdown on outside click
+document.addEventListener('click', function(e) {
+  var dropdown = document.getElementById('sv-dropdown');
+  if (dropdown && !dropdown.contains(e.target)) {
+    var menu = document.getElementById('sv-menu');
+    if (menu) menu.classList.add('hidden');
+  }
+});
+// Close modal on backdrop click
+var svModal = document.getElementById('sv-modal');
+if (svModal) {
+  svModal.addEventListener('click', function(e) {
+    if (e.target === svModal) closeSaveViewModal();
+  });
+}
+// Enter key in name input
+var svInput = document.getElementById('sv-name-input');
+if (svInput) {
+  svInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); saveSavedView(); }
+  });
 }
 </script>
 {% endblock %}

@@ -8,16 +8,18 @@
 <h1 style="font-size:22px; font-weight:700; margin:0 0 20px 0;">Projekt bearbeiten</h1>
 
 <form hx-put="{{ prefix }}/projects/{{ project.id }}" hx-target="body" hx-swap="outerHTML" style="max-width:600px;">
+
+  {# ── BASIS ─────────────────────────────────────────────────────────────── #}
   <div class="card" style="margin-bottom:16px;">
-    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Basis</div>
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-bottom:14px;">Basis</div>
 
     <div class="form-group">
-      <label>Name *</label>
+      <label class="required">Name</label>
       <input type="text" name="name" value="{{ project.name }}" required>
     </div>
 
     <div class="form-group">
-      <label>Delivery Owner *</label>
+      <label class="required">Delivery Owner</label>
       <select name="delivery_owner" required>
         {% for o in owners %}
         <option value="{{ o }}" {% if project.delivery_owner == o %}selected{% endif %}>{{ o|capitalize }}</option>
@@ -43,39 +45,62 @@
       <label>Geplantes Enddatum</label>
       <input type="date" name="end_date_planned" value="{{ project.end_date_planned or '' }}">
     </div>
+
+    <div class="form-group">
+      <label>Kickoff-Datum</label>
+      <input type="date" name="kickoff_date" value="{{ project.kickoff_date or '' }}">
+    </div>
+
+    <div class="form-group">
+      <label>Phase</label>
+      <select name="phase">
+        <option value="">– nicht gesetzt –</option>
+        <option value="kick_off" {% if project.phase == 'kick_off' %}selected{% endif %}>Kick-off</option>
+        <option value="in_arbeit" {% if project.phase == 'in_arbeit' %}selected{% endif %}>In Arbeit</option>
+        <option value="review" {% if project.phase == 'review' %}selected{% endif %}>Review</option>
+        <option value="abgeschlossen" {% if project.phase == 'abgeschlossen' %}selected{% endif %}>Abgeschlossen</option>
+      </select>
+    </div>
   </div>
 
+  {# ── FINANZEN ──────────────────────────────────────────────────────────── #}
   <div class="card" style="margin-bottom:16px;">
-    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Finanzen</div>
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-bottom:14px;">Finanzen</div>
 
     <div class="form-group">
       <label>Soll-Umsatz (€)</label>
       <input type="number" name="contract_value" step="0.01" value="{{ project.contract_value or '' }}">
-    </div>
-
-    <div class="form-group">
-      <label>Ist-Rechnungen (€)</label>
-      <input type="number" name="ist_rechnungen" step="0.01" value="{{ project.ist_rechnungen or 0 }}">
-      <small style="color:#555; font-size:11px;">Rechnungsgrad wird automatisch berechnet</small>
+      <small style="color:var(--text-muted); font-size:11px;">Ist-Rechnungen werden über Rechnungs-Eingänge berechnet</small>
     </div>
   </div>
 
+  {# ── KONTEXT ───────────────────────────────────────────────────────────── #}
   <div class="card" style="margin-bottom:20px;">
-    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Kontext</div>
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-bottom:14px;">Kontext</div>
 
     <div class="form-group">
       <label>Outcome-Definition</label>
-      <textarea name="outcome_definition" rows="3">{{ project.outcome_definition or '' }}</textarea>
+      <textarea name="outcome_definition" rows="3" placeholder="Was soll mit diesem Projekt erreicht werden?">{{ project.outcome_definition or '' }}</textarea>
     </div>
 
     <div class="form-group">
-      <label>Dokumentations-Link</label>
-      <input type="url" name="dok_link" value="{{ project.dok_link or '' }}" placeholder="https://drive.google.com/…">
+      <label>Google Drive Ordner</label>
+      <input type="url" name="dok_link" value="{{ project.dok_link or '' }}" placeholder="https://drive.google.com/drive/folders/...">
     </div>
 
     <div class="form-group">
       <label>Ausblick</label>
-      <textarea name="ausblick" rows="2">{{ project.ausblick or '' }}</textarea>
+      <textarea name="ausblick" rows="2" placeholder="Nächste Schritte, Perspektive...">{{ project.ausblick or '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Risiko-Status</label>
+      <select name="risiko_status">
+        <option value="">– nicht bewertet –</option>
+        <option value="gruen" {% if project.risiko_status == 'gruen' %}selected{% endif %}>● Grün – Auf Kurs</option>
+        <option value="gelb" {% if project.risiko_status == 'gelb' %}selected{% endif %}>● Gelb – Risiko vorhanden</option>
+        <option value="rot" {% if project.risiko_status == 'rot' %}selected{% endif %}>● Rot – Eingriff nötig</option>
+      </select>
     </div>
 
     <div class="form-group">

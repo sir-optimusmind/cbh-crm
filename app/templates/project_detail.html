@@ -1,87 +1,358 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} – CBH CRM{% endblock %}
 {% block content %}
+
+{# ── BREADCRUMB ─────────────────────────────────────────────────────────────── #}
 <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
   <a href="{{ prefix }}/projects" class="btn-secondary btn-sm">← Projekte</a>
-  {% if project.deal_id %}
-  <a href="{{ prefix }}/deals/{{ project.deal_id }}" class="btn-secondary btn-sm">→ Deal: {{ project.deal_titel or '#' + project.deal_id|string }}</a>
+  {% if project.deal_id and project.deal_titel %}
+  <a href="{{ prefix }}/deals/{{ project.deal_id }}" class="btn-secondary btn-sm">→ Deal: {{ project.deal_titel }}</a>
   {% endif %}
 </div>
 
+{# ── HEADER ─────────────────────────────────────────────────────────────────── #}
 <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
   <div>
-    <h1 style="font-size:24px; font-weight:700; margin:0 0 6px 0;">{{ project.name }}</h1>
-    <div style="display:flex; gap:8px; align-items:center;">
+    <h1 style="font-size:24px; font-weight:700; margin:0 0 8px 0;">{{ project.name }}</h1>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      {# Status Badge #}
       {% if project.status == 'active' %}<span class="badge badge-green">active</span>
       {% elif project.status == 'completed' %}<span class="badge badge-blue">completed</span>
       {% elif project.status == 'on_hold' %}<span class="badge badge-orange">on hold</span>
       {% else %}<span class="badge" style="background:#333; color:#777;">{{ project.status }}</span>
       {% endif %}
+      {# Owner Badge #}
       <span class="badge badge-yellow">{{ project.delivery_owner }}</span>
+      {# Risiko-Ampel (CRM-076) #}
+      {% if project.risiko_status %}
+      <span class="risiko-ampel risiko-{{ project.risiko_status }}" title="Risiko: {{ project.risiko_status|capitalize }}">
+        ● {{ project.risiko_status|upper }}
+      </span>
+      {% endif %}
     </div>
   </div>
   <a href="{{ prefix }}/projects/{{ project.id }}/edit" class="btn-primary">Bearbeiten</a>
 </div>
 
-<div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
-  <div class="card">
-    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Projekt-Details</div>
-    <div style="display:grid; grid-template-columns:140px 1fr; gap:8px 12px; font-size:14px;">
-      <div style="color:#aaa; font-weight:600;">Kunde</div>
-      <div>{{ project.kunde_name or '–' }}</div>
-      <div style="color:#aaa; font-weight:600;">Delivery Owner</div>
-      <div><span class="badge badge-yellow">{{ project.delivery_owner }}</span></div>
-      <div style="color:#aaa; font-weight:600;">Startdatum</div>
-      <div>{{ project.start_date or '–' }}</div>
-      <div style="color:#aaa; font-weight:600;">Geplantes Ende</div>
-      <div>{{ project.end_date_planned or '–' }}</div>
-      {% if project.dok_link %}
-      <div style="color:#aaa; font-weight:600;">Dokumentation</div>
-      <div><a href="{{ project.dok_link }}" target="_blank" style="color:#5870E2;">→ Google Drive</a></div>
-      {% endif %}
-    </div>
-    {% if project.outcome_definition %}
-    <div style="margin-top:14px; padding-top:14px; border-top:1px solid #333;">
-      <div style="font-size:11px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:6px;">Outcome-Definition</div>
-      <div style="font-size:14px; color:#ddd; line-height:1.5;">{{ project.outcome_definition }}</div>
-    </div>
-    {% endif %}
-    {% if project.ausblick %}
-    <div style="margin-top:14px; padding-top:14px; border-top:1px solid #333;">
-      <div style="font-size:11px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:6px;">Ausblick</div>
-      <div style="font-size:14px; color:#ddd; line-height:1.5;">{{ project.ausblick }}</div>
-    </div>
-    {% endif %}
-  </div>
+{# ── 2-SPALTEN GRID ────────────────────────────────────────────────────────── #}
+<div style="display:grid; grid-template-columns:280px 1fr; gap:20px; align-items:start;" class="project-grid">
 
-  <div class="card">
-    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#aaa; margin-bottom:14px;">Finanzen</div>
-    <div style="display:grid; grid-template-columns:140px 1fr; gap:8px 12px; font-size:14px;">
-      <div style="color:#aaa; font-weight:600;">Soll-Umsatz</div>
-      <div style="font-weight:700; color:#FFFB76; font-size:18px;">
-        {% if project.contract_value %}€{{ "{:,.0f}".format(project.contract_value) }}{% else %}–{% endif %}
+  {# ══ SIDEBAR ═══════════════════════════════════════════════════════════════ #}
+  <div>
+
+    {# Block A: Projekt-Details #}
+    <div class="card" style="margin-bottom:16px;">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:14px;">Projekt-Details</div>
+      <div style="display:grid; grid-template-columns:auto 1fr; gap:6px 12px; font-size:13px;">
+        <span style="color:var(--text-secondary); font-weight:600;">Kunde</span>
+        <span>
+          {% if project.kunde_name %}
+            {% if project.deal_id %}<a href="{{ prefix }}/deals/{{ project.deal_id }}" style="color:var(--accent-blue);">{{ project.kunde_name }}</a>
+            {% else %}{{ project.kunde_name }}{% endif %}
+          {% else %}–{% endif %}
+        </span>
+        <span style="color:var(--text-secondary); font-weight:600;">Delivery Owner</span>
+        <span><span class="badge badge-yellow">{{ project.delivery_owner }}</span></span>
+        <span style="color:var(--text-secondary); font-weight:600;">Startdatum</span>
+        <span>{{ project.start_date or '–' }}</span>
+        <span style="color:var(--text-secondary); font-weight:600;">Geplantes Ende</span>
+        <span>{{ project.end_date_planned or '–' }}</span>
+        <span style="color:var(--text-secondary); font-weight:600;">Kickoff</span>
+        <span>{{ project.kickoff_date or '–' }}</span>
+        <span style="color:var(--text-secondary); font-weight:600;">Dok-Link</span>
+        <span>
+          {% if project.dok_link %}
+          <a href="{{ project.dok_link }}" target="_blank" style="color:var(--accent-blue);">→ Google Drive</a>
+          {% else %}–{% endif %}
+        </span>
       </div>
-      <div style="color:#aaa; font-weight:600;">Ist-Rechnungen</div>
-      <div style="font-size:16px;">{% if project.ist_rechnungen %}€{{ "{:,.0f}".format(project.ist_rechnungen) }}{% else %}€0{% endif %}</div>
-      <div style="color:#aaa; font-weight:600;">Rechnungsgrad</div>
+    </div>
+
+    {# Block B: Finanzen #}
+    <div class="card" style="margin-bottom:16px;">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:14px;">Finanzen</div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:11px; color:var(--text-secondary); font-weight:600; margin-bottom:2px;">SOLL-UMSATZ</div>
+        <div style="font-size:20px; font-weight:700; color:var(--accent-yellow);">
+          {% if project.contract_value %}€{{ "{:,.0f}".format(project.contract_value) }}{% else %}–{% endif %}
+        </div>
+      </div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:11px; color:var(--text-secondary); font-weight:600; margin-bottom:2px;">IST-RECHNUNGEN</div>
+        <div style="font-size:16px;">€{{ "{:,.0f}".format(project.ist_rechnungen or 0) }}</div>
+      </div>
+      {% if project.rechnungsgrad is not none %}
       <div>
-        {% if project.rechnungsgrad is not none %}
+        <div style="font-size:11px; color:var(--text-secondary); font-weight:600; margin-bottom:4px;">RECHNUNGSGRAD</div>
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-          <span style="font-size:20px; font-weight:700; color:{% if project.rechnungsgrad >= 80 %}#34D399{% elif project.rechnungsgrad >= 30 %}#FB923C{% else %}#aaa{% endif %};">{{ project.rechnungsgrad }}%</span>
+          <span style="font-size:18px; font-weight:700; color:{% if project.rechnungsgrad >= 80 %}var(--status-success){% elif project.rechnungsgrad >= 30 %}var(--status-warning){% else %}var(--text-muted){% endif %};">{{ project.rechnungsgrad }}%</span>
         </div>
         <div class="progress-bar">
-          <div class="progress-bar-fill" style="width:{{ [project.rechnungsgrad, 100]|min }}%; background:{% if project.rechnungsgrad >= 80 %}#34D399{% elif project.rechnungsgrad >= 30 %}#FB923C{% else %}#555{% endif %};"></div>
+          <div class="progress-bar-fill" style="width:{{ [project.rechnungsgrad, 100]|min }}%; background:{% if project.rechnungsgrad >= 80 %}var(--status-success){% elif project.rechnungsgrad >= 30 %}var(--status-warning){% else %}#555{% endif %};"></div>
         </div>
-        {% else %}–{% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    {# Block C: Ausblick (nur wenn gesetzt) #}
+    {% if project.ausblick %}
+    <div class="card">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px;">Ausblick</div>
+      <div style="font-size:13px; color:var(--text-primary); line-height:1.6; white-space:pre-wrap;">{{ project.ausblick }}</div>
+    </div>
+    {% endif %}
+
+  </div>{# /SIDEBAR #}
+
+  {# ══ HAUPTBEREICH ═══════════════════════════════════════════════════════════ #}
+  <div style="display:flex; flex-direction:column; gap:16px;">
+
+    {# Block 1: Outcomes (CRM-079) #}
+    <div class="card">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px;">Outcomes</div>
+      {% if project.outcome_definition %}
+      <div style="background:var(--bg-input); border-left:3px solid var(--accent-yellow); padding:14px 16px; border-radius:0 4px 4px 0;">
+        <div style="font-size:14px; color:var(--text-primary); line-height:1.6;">{{ project.outcome_definition }}</div>
+      </div>
+      {% else %}
+      <div style="color:var(--text-muted); font-size:12px; font-style:italic;">
+        Kein Outcome definiert –
+        <a href="{{ prefix }}/projects/{{ project.id }}/edit" style="color:var(--accent-blue);">Jetzt eintragen</a>
+      </div>
+      {% endif %}
+    </div>
+
+    {# Block 2: Phasen-Timeline (CRM-075) #}
+    <div class="card">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:12px;">Status-Phasen</div>
+      <div class="phase-timeline">
+        {% set phasen = ['kick_off', 'in_arbeit', 'review', 'abgeschlossen'] %}
+        {% set phasen_labels = {'kick_off': 'Kick-off', 'in_arbeit': 'In Arbeit', 'review': 'Review', 'abgeschlossen': 'Abgeschlossen'} %}
+        {% set current_idx = phasen.index(project.phase) if project.phase in phasen else -1 %}
+        {% for phase in phasen %}
+        {% set loop_idx = loop.index0 %}
+        <div class="pt-step {% if project.phase == phase %}pt-active{% elif current_idx > loop_idx %}pt-done{% endif %}">
+          <div class="pt-dot"></div>
+          <div class="pt-label">{{ phasen_labels[phase] }}</div>
+        </div>
+        {% if not loop.last %}<div class="pt-line"></div>{% endif %}
+        {% endfor %}
       </div>
     </div>
-  </div>
-</div>
 
-{% if project.notes %}
-<div class="card">
-  <div style="font-size:11px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:8px;">Notizen</div>
-  <div style="font-size:14px; color:#ddd; line-height:1.5; white-space:pre-wrap;">{{ project.notes }}</div>
-</div>
-{% endif %}
+    {# Block 3: Rechnungen (CRM-074) #}
+    <div class="card" id="rechnungen-card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted);">Rechnungen</div>
+        <button onclick="document.getElementById('rechnung-form').style.display='block'; this.style.display='none';"
+                class="btn-primary btn-sm">+ Eingang</button>
+      </div>
+
+      {# Inline-Formular (collapsed) #}
+      <div id="rechnung-form" style="display:none; padding:14px; background:var(--bg-input); border-radius:6px; margin-bottom:14px;">
+        <form action="{{ prefix }}/projects/{{ project.id }}/rechnungen" method="post">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;" class="rechnung-grid">
+            <div class="form-group" style="margin:0;">
+              <label class="required">Datum</label>
+              <input type="date" name="datum" required>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="required">Betrag (€)</label>
+              <input type="number" name="betrag" step="0.01" min="0.01" required>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>Status</label>
+              <select name="status">
+                <option value="offen">Offen</option>
+                <option value="bezahlt">Bezahlt</option>
+                <option value="storniert">Storniert</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Notiz (optional)</label>
+            <input type="text" name="notiz" placeholder="z.B. Anzahlung 50%">
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="submit" class="btn-primary btn-sm">Speichern</button>
+            <button type="button" onclick="document.getElementById('rechnung-form').style.display='none'; document.querySelector('#rechnungen-card .btn-primary.btn-sm').style.display='';" class="btn-secondary btn-sm">Abbrechen</button>
+          </div>
+        </form>
+      </div>
+
+      {# Tabelle #}
+      {% if rechnungen %}
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Datum</th>
+              <th>Betrag</th>
+              <th>Notiz</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rechnungen %}
+            <tr>
+              <td style="color:var(--text-muted); font-size:12px;">{{ loop.index }}</td>
+              <td style="font-size:13px;">{{ r.datum }}</td>
+              <td style="font-weight:600;">€{{ "{:,.2f}".format(r.betrag) }}</td>
+              <td style="font-size:12px; color:var(--text-secondary);">{{ r.notiz or '–' }}</td>
+              <td>
+                {% if r.status == 'bezahlt' %}<span class="badge badge-green">bezahlt</span>
+                {% elif r.status == 'storniert' %}<span class="badge badge-red">storniert</span>
+                {% else %}<span class="badge" style="border:1px solid var(--text-muted); color:var(--text-muted); background:transparent;">offen</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr style="border-top:2px solid var(--border); background:var(--bg-input);">
+              <td colspan="2" style="font-weight:700; color:var(--text-primary); font-size:13px;">Gesamt</td>
+              <td style="font-weight:700; color:var(--accent-yellow);">€{{ "{:,.2f}".format(ist_bezahlt) }}</td>
+              <td style="color:var(--text-secondary); font-size:12px;">/ €{{ "{:,.0f}".format(project.contract_value or 0) }}</td>
+              <td style="font-weight:700; color:{% if project.rechnungsgrad is not none %}{% if project.rechnungsgrad >= 80 %}var(--status-success){% elif project.rechnungsgrad >= 30 %}var(--status-warning){% else %}var(--text-muted){% endif %}{% else %}var(--text-muted){% endif %};">
+                {% if project.rechnungsgrad is not none %}{{ project.rechnungsgrad }}%{% else %}–{% endif %}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <div style="color:var(--text-muted); font-size:13px; text-align:center; padding:20px 0;">
+        Noch keine Rechnungen eingetragen.
+        <span style="color:var(--text-secondary); cursor:pointer;"
+              onclick="document.getElementById('rechnung-form').style.display='block'; document.querySelector('#rechnungen-card .btn-primary.btn-sm').style.display='none';">
+          Jetzt eintragen
+        </span>
+      </div>
+      {% endif %}
+    </div>
+
+    {# Block 4: Touchpoints (CRM-077) #}
+    <div class="card" id="projekt-tp-section">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted);">Projekt-Kommunikation</div>
+        <button onclick="document.getElementById('add-proj-tp-form').style.display='block'; this.style.display='none';"
+                class="btn-primary btn-sm">+ Touchpoint</button>
+      </div>
+
+      {# Touchpoint-Formular #}
+      <div id="add-proj-tp-form" style="display:none; padding:14px; background:var(--bg-input); border-radius:6px; margin-bottom:14px;">
+        <form action="{{ prefix }}/projects/{{ project.id }}/touchpoints" method="post">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;" class="rechnung-grid">
+            <div class="form-group" style="margin:0;">
+              <label>Art</label>
+              <select name="art" required>
+                <option value="anruf">Anruf</option>
+                <option value="email">E-Mail</option>
+                <option value="meeting">Meeting</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="notiz">Notiz</option>
+                <option value="other">Sonstiges</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="required">Datum</label>
+              <input type="date" name="datum" required id="proj-tp-datum">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="required">Erstellt von</label>
+              <select name="erstellt_von" required>
+                {% for o in owners %}
+                <option value="{{ o }}">{{ o|capitalize }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="required">Inhalt</label>
+            <textarea name="inhalt" rows="3" required placeholder="Was wurde besprochen?"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Details (optional)</label>
+            <textarea name="details" rows="2" placeholder="Detailnotizen..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Nächster Schritt</label>
+            <input type="text" name="naechster_schritt" placeholder="z.B. Angebot bis Freitag">
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="submit" class="btn-primary btn-sm">Speichern</button>
+            <button type="button" onclick="document.getElementById('add-proj-tp-form').style.display='none'; document.querySelector('#projekt-tp-section .btn-primary.btn-sm').style.display='';" class="btn-secondary btn-sm">Abbrechen</button>
+          </div>
+        </form>
+      </div>
+
+      {# Timeline #}
+      {% if touchpoints %}
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        {% for tp in touchpoints %}
+        <div style="padding:12px; background:var(--bg-input); border-radius:6px; border-left:3px solid
+          {% if tp.art == 'anruf' %}#5870E2
+          {% elif tp.art == 'meeting' %}#FFFB76
+          {% elif tp.art == 'email' %}#34D399
+          {% elif tp.art == 'linkedin' %}#3B82F6
+          {% else %}#555{% endif %};">
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px;">
+            <span class="badge" style="background:#2a2a2a; color:#aaa; text-transform:capitalize;">{{ tp.art }}</span>
+            <span style="font-size:12px; color:var(--text-muted);">{{ tp.datum }}</span>
+            <span style="font-size:12px; color:#555;">von {{ tp.erstellt_von }}</span>
+          </div>
+          <div style="font-size:13px; color:var(--text-primary); line-height:1.5; white-space:pre-wrap;">{{ tp.inhalt }}</div>
+          {% if tp.details %}
+          <div style="margin-top:6px;">
+            <button onclick="var d=this.nextElementSibling; d.style.display=d.style.display==='none'?'block':'none';"
+                    style="background:none; border:none; color:var(--accent-blue); font-size:11px; cursor:pointer; padding:0;">▼ Details anzeigen</button>
+            <div style="display:none; margin-top:6px; font-size:12px; color:#aaa; line-height:1.5; white-space:pre-wrap;">{{ tp.details }}</div>
+          </div>
+          {% endif %}
+          {% if tp.naechster_schritt %}
+          <div style="font-size:12px; color:var(--accent-yellow); margin-top:6px;">→ {{ tp.naechster_schritt }}</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="color:var(--text-muted); font-size:13px; text-align:center; padding:24px 0;">
+        Noch keine Kommunikation dokumentiert.
+        <span style="color:var(--text-secondary); cursor:pointer;"
+              onclick="document.getElementById('add-proj-tp-form').style.display='block'; document.querySelector('#projekt-tp-section .btn-primary.btn-sm').style.display='none';">
+          Ersten Touchpoint anlegen
+        </span>
+      </div>
+      {% endif %}
+    </div>
+
+    {# Block 5: Notizen #}
+    {% if project.notes %}
+    <div class="card">
+      <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Notizen</div>
+      <div style="font-size:13px; color:var(--text-primary); line-height:1.5; white-space:pre-wrap;">{{ project.notes }}</div>
+    </div>
+    {% endif %}
+
+    {# Meta-Footer #}
+    <div style="font-size:11px; color:var(--text-muted); display:grid; grid-template-columns:auto 1fr; gap:4px 10px;">
+      <span>Angelegt:</span><span>{{ project.created_at[:16].replace('T',' ') if project.created_at else '–' }} UTC</span>
+      <span>Geändert:</span><span>{{ project.updated_at[:16].replace('T',' ') if project.updated_at else '–' }} UTC</span>
+    </div>
+
+  </div>{# /HAUPTBEREICH #}
+
+</div>{# /GRID #}
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Datum-Default heute
+  var datumFields = document.querySelectorAll('#proj-tp-datum, input[name="datum"]');
+  var today = new Date().toISOString().slice(0, 10);
+  datumFields.forEach(function(f) { if (!f.value) f.value = today; });
+});
+</script>
 {% endblock %}

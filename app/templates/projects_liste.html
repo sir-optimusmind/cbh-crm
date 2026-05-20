@@ -5,36 +5,79 @@
   <h1 style="font-size:22px; font-weight:700; margin:0;">Projekte</h1>
 </div>
 
-<!-- Filter -->
+{# ── FILTER-BAR (CRM-078) ─────────────────────────────────────────────────── #}
 <div class="card" style="margin-bottom:16px; padding:14px 20px;">
   <form method="get" action="{{ prefix }}/projects" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
-    <div>
-      <label>Status</label>
-      <select name="status" style="width:140px;">
-        <option value="">Alle</option>
+
+    {# Status-Chips #}
+    <div style="display:flex; flex-direction:column; gap:4px;">
+      <label style="font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.1em;">Status</label>
+      <div style="display:inline-flex; gap:6px; align-items:center; flex-wrap:wrap;">
+        <a href="{{ prefix }}/projects?{% if filter_owner %}owner={{ filter_owner }}&{% endif %}{% if filter_q %}q={{ filter_q }}&{% endif %}sort={{ sort_col }}&dir={{ sort_dir }}"
+           style="padding:5px 12px; border:1px solid {% if not filter_status %}var(--accent-yellow){% else %}var(--border){% endif %}; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; text-decoration:none; background:{% if not filter_status %}rgba(255,251,118,0.12){% else %}transparent{% endif %}; color:{% if not filter_status %}var(--accent-yellow){% else %}var(--text-muted){% endif %};">Alle</a>
         {% for s in statuses %}
-        <option value="{{ s }}" {% if filter_status == s %}selected{% endif %}>{{ s|replace('_',' ')|capitalize }}</option>
+        <a href="{{ prefix }}/projects?status={{ s }}{% if filter_owner %}&owner={{ filter_owner }}{% endif %}{% if filter_q %}&q={{ filter_q }}{% endif %}&sort={{ sort_col }}&dir={{ sort_dir }}"
+           style="padding:5px 12px; border:1px solid {% if filter_status == s %}var(--accent-yellow){% else %}var(--border){% endif %}; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; text-decoration:none; background:{% if filter_status == s %}rgba(255,251,118,0.12){% else %}transparent{% endif %}; color:{% if filter_status == s %}var(--accent-yellow){% else %}var(--text-muted){% endif %};">{{ s|replace('_',' ')|capitalize }}</a>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# Owner-Filter #}
+    <div style="display:flex; flex-direction:column; gap:4px;">
+      <label style="font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.1em;">Owner</label>
+      <select name="owner" style="width:140px;" onchange="this.form.submit()">
+        <option value="" {% if not filter_owner %}selected{% endif %}>Alle</option>
+        {% for o in owners %}
+        <option value="{{ o }}" {% if filter_owner == o %}selected{% endif %}>{{ o|capitalize }}</option>
         {% endfor %}
       </select>
     </div>
-    <button type="submit" class="btn-secondary btn-sm">Filtern</button>
-    <a href="{{ prefix }}/projects" class="btn-secondary btn-sm">Reset</a>
+
+    {# Such-Feld #}
+    <div style="display:flex; flex-direction:column; gap:4px;">
+      <label style="font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.1em;">Suche</label>
+      <div style="display:flex; gap:6px;">
+        <input type="search" name="q" value="{{ filter_q }}" placeholder="Projekt oder Kunde" style="width:220px;">
+        <button type="submit" class="btn-secondary btn-sm">Suchen</button>
+      </div>
+    </div>
+
+    {# Hidden fields fuer Status + Sort-State #}
+    {% if filter_status %}<input type="hidden" name="status" value="{{ filter_status }}">{% endif %}
+    <input type="hidden" name="sort" value="{{ sort_col }}">
+    <input type="hidden" name="dir" value="{{ sort_dir }}">
+
+    {% if filter_status or filter_owner or filter_q %}
+    <div style="display:flex; flex-direction:column; justify-content:flex-end;">
+      <a href="{{ prefix }}/projects" class="btn-secondary btn-sm">Reset</a>
+    </div>
+    {% endif %}
   </form>
 </div>
 
+{# ── TABELLE ──────────────────────────────────────────────────────────────── #}
 <div class="card" style="padding:0; overflow:hidden;">
   <table>
     <thead>
       <tr>
-        <th>Projekt</th>
-        <th>Kunde</th>
-        <th>Status</th>
-        <th>Outcome-Def</th>
-        <th>Soll-Umsatz</th>
-        <th>Ist-Rechnungen</th>
-        <th>Rechnungsgrad</th>
-        <th>Ausblick</th>
-        <th>Dok</th>
+        {# Sortierbare Spalten-Helper #}
+        {% macro sort_link(col, label) %}
+          {% set new_dir = 'asc' if (sort_col == col and sort_dir == 'desc') else 'desc' if sort_col == col else 'asc' %}
+          <th>
+            <a href="{{ prefix }}/projects?{% if filter_status %}status={{ filter_status }}&{% endif %}{% if filter_owner %}owner={{ filter_owner }}&{% endif %}{% if filter_q %}q={{ filter_q }}&{% endif %}sort={{ col }}&dir={{ new_dir }}"
+               style="text-decoration:none; color:{% if sort_col == col %}var(--accent-yellow){% else %}var(--text-secondary){% endif %}; font-weight:{% if sort_col == col %}700{% else %}600{% endif %}; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; display:inline-flex; align-items:center; gap:4px;">
+              {{ label }}{% if sort_col == col %} {% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
+            </a>
+          </th>
+        {% endmacro %}
+        {{ sort_link('name', 'Projekt') }}
+        {{ sort_link('kunde_name', 'Kunde') }}
+        {{ sort_link('status', 'Status') }}
+        <th style="font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-secondary);">Phase</th>
+        <th style="font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-secondary);">Risiko</th>
+        {{ sort_link('contract_value', 'Soll-Umsatz') }}
+        {{ sort_link('ist_rechnungen', 'Ist') }}
+        {{ sort_link('rechnungsgrad', 'Rechnungsgrad') }}
       </tr>
     </thead>
     <tbody>
@@ -42,8 +85,8 @@
       {% for p in projects %}
       <tr>
         <td>
-          <a href="{{ prefix }}/projects/{{ p.id }}" style="color:#5870E2; text-decoration:none; font-weight:600;">{{ p.name }}</a>
-          <div style="font-size:11px; color:#555;">{{ p.delivery_owner }}</div>
+          <a href="{{ prefix }}/projects/{{ p.id }}" style="color:var(--accent-blue); text-decoration:none; font-weight:600;">{{ p.name }}</a>
+          <div style="font-size:11px; color:var(--text-muted);">{{ p.delivery_owner }}</div>
         </td>
         <td style="font-size:13px;">{{ p.kunde_name or '–' }}</td>
         <td>
@@ -53,27 +96,38 @@
           {% else %}<span class="badge" style="background:#333; color:#777;">{{ p.status }}</span>
           {% endif %}
         </td>
-        <td style="font-size:12px; color:#aaa; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ p.outcome_definition or '' }}">{{ p.outcome_definition or '–' }}</td>
-        <td style="font-weight:600; color:#FFFB76;">
+        <td style="font-size:12px; color:var(--text-secondary);">
+          {% if p.phase %}{{ p.phase|replace('_',' ')|capitalize }}{% else %}–{% endif %}
+        </td>
+        <td>
+          {% if p.risiko_status %}
+          <span class="risiko-ampel risiko-{{ p.risiko_status }}" style="font-size:10px; padding:2px 8px;">● {{ p.risiko_status|upper }}</span>
+          {% else %}–{% endif %}
+        </td>
+        <td style="font-weight:600; color:var(--accent-yellow);">
           {% if p.contract_value %}€{{ "{:,.0f}".format(p.contract_value) }}{% else %}–{% endif %}
         </td>
-        <td>{% if p.ist_rechnungen %}€{{ "{:,.0f}".format(p.ist_rechnungen) }}{% else %}€0{% endif %}</td>
+        <td>€{{ "{:,.0f}".format(p.ist_rechnungen or 0) }}</td>
         <td style="min-width:100px;">
           {% if p.rechnungsgrad is not none %}
           <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:12px; font-weight:700; color:{% if p.rechnungsgrad >= 80 %}#34D399{% elif p.rechnungsgrad >= 30 %}#FB923C{% else %}#aaa{% endif %};">{{ p.rechnungsgrad }}%</span>
+            <span style="font-size:12px; font-weight:700; color:{% if p.rechnungsgrad >= 80 %}var(--status-success){% elif p.rechnungsgrad >= 30 %}var(--status-warning){% else %}var(--text-muted){% endif %};">{{ p.rechnungsgrad }}%</span>
             <div class="progress-bar" style="width:60px;">
-              <div class="progress-bar-fill" style="width:{{ [p.rechnungsgrad, 100]|min }}%; background:{% if p.rechnungsgrad >= 80 %}#34D399{% elif p.rechnungsgrad >= 30 %}#FB923C{% else %}#555{% endif %};"></div>
+              <div class="progress-bar-fill" style="width:{{ [p.rechnungsgrad, 100]|min }}%; background:{% if p.rechnungsgrad >= 80 %}var(--status-success){% elif p.rechnungsgrad >= 30 %}var(--status-warning){% else %}#555{% endif %};"></div>
             </div>
           </div>
           {% else %}–{% endif %}
         </td>
-        <td style="font-size:12px; color:#aaa; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ p.ausblick or '' }}">{{ p.ausblick or '–' }}</td>
-        <td>{% if p.dok_link %}<a href="{{ p.dok_link }}" target="_blank" style="color:#5870E2; font-size:12px;">→ Drive</a>{% else %}–{% endif %}</td>
       </tr>
       {% endfor %}
       {% else %}
-      <tr><td colspan="9" style="text-align:center; color:#555; padding:32px;">Keine Projekte vorhanden. Projekte entstehen automatisch wenn ein Deal auf Won gesetzt wird.</td></tr>
+      <tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:32px;">
+        {% if filter_status or filter_owner or filter_q %}
+        Keine Projekte gefunden. <a href="{{ prefix }}/projects" style="color:var(--accent-blue);">Filter zurücksetzen</a>
+        {% else %}
+        Keine Projekte vorhanden. Projekte entstehen automatisch wenn ein Deal auf Won gesetzt wird.
+        {% endif %}
+      </td></tr>
       {% endif %}
     </tbody>
   </table>

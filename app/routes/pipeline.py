@@ -191,6 +191,17 @@ async def _pipeline_kanban_view(request: Request, prefix: str, active_filters: l
     def build_filter_url(product):
         return _build_filter_url(active_filters, product)
 
+    # Saved Views fuer aktuellen User laden (BUG-007)
+    user_id = _current_user_id(request)
+    sv_conn = get_connection()
+    try:
+        saved_views_rows = sv_conn.execute(
+            "SELECT * FROM saved_view WHERE user_id=? ORDER BY created_at DESC", (user_id,)
+        ).fetchall()
+        saved_views = [dict(r) for r in saved_views_rows]
+    finally:
+        sv_conn.close()
+
     return templates.TemplateResponse(request, "pipeline.html", tmpl_ctx(request, {
         "request": request,
         "prefix": prefix,
@@ -200,6 +211,7 @@ async def _pipeline_kanban_view(request: Request, prefix: str, active_filters: l
         "active_filters": active_filters,
         "products_filter": PRODUCTS_FILTER,
         "build_filter_url": build_filter_url,
+        "saved_views": saved_views,
     }))
 
 
