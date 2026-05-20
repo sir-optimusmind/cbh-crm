@@ -457,6 +457,17 @@ label.required::after { content: ' *'; color: var(--accent-yellow); font-weight:
 /* Projekt-Grid Mobile */
 @media (max-width: 900px) { .project-grid { grid-template-columns: 1fr !important; } }
 @media (max-width: 768px) { .rechnung-grid { grid-template-columns: 1fr !important; } }
+/* Phase-Timeline Mobile: vertikal stapeln bei <768px (Kenny-Backlog Item 3) */
+@media (max-width: 768px) {
+  .phase-timeline { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .pt-step { flex-direction: row; align-items: center; gap: 10px; width: 100%; }
+  .pt-label { white-space: normal; }
+  .pt-line { display: none; }
+  /* Google Picker Z-Index (über <dialog>, Sprint 4 CRM-066) */
+}
+/* Google Picker overlay – über Won-Modal (Sprint 4 CRM-066) */
+.picker-dialog,
+.picker-dialog-bg { z-index: 10001 !important; }
 
 /* Saved Views Dropdown (BUG-007) */
 .saved-views-dropdown { position: relative; display: inline-block; }

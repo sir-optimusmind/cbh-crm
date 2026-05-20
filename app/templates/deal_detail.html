@@ -70,6 +70,21 @@
       <div>{{ deal.unterschrift_datum or '–' }}</div>
       <div style="color:#aaa; font-weight:600;">Projektstart</div>
       <div>{{ deal.projekt_start_datum or '–' }}</div>
+      {% if deal.project and deal.project.drive_folder_url %}
+      <div style="color:#aaa; font-weight:600;">Drive-Ordner</div>
+      <div>
+        <a href="{{ deal.project.drive_folder_url }}"
+           target="_blank" rel="noopener noreferrer"
+           style="color:#5870E2; text-decoration:none; display:inline-flex; align-items:center; gap:5px; font-size:13px;"
+           onmouseover="this.style.color='#FFFB76'"
+           onmouseout="this.style.color='#5870E2'">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" style="flex-shrink:0;">
+            <path d="M1.5 3A1.5 1.5 0 0 0 0 4.5v8A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H7.621a1.5 1.5 0 0 1-1.06-.44L5.5 3H1.5Z"/>
+          </svg>
+          {{ deal.project.drive_folder_name or 'Drive-Ordner' }}
+        </a>
+      </div>
+      {% endif %}
       {% endif %}
       {% if deal.stage == 'lost' %}
       <div style="color:#aaa; font-weight:600;">Verlustgrund</div>

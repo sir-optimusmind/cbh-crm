@@ -30,6 +30,10 @@ _MIGRATION_007 = Path(__file__).parent.parent / "migrations" / "006_stage_histor
 _MIGRATION_008 = Path(__file__).parent.parent / "migrations" / "007_verlust_reason_enum.sql"
 _MIGRATION_009 = Path(__file__).parent.parent / "migrations" / "008_saved_view.sql"
 _MIGRATION_010 = Path(__file__).parent.parent / "migrations" / "009_lost_competitor.sql"
+_MIGRATION_012 = Path(__file__).parent.parent / "migrations" / "012_drive_folder_foundation.sql"
+_MIGRATION_013 = Path(__file__).parent.parent / "migrations" / "013_ist_rechnungen_migration.sql"
+_MIGRATION_012 = Path(__file__).parent.parent / "migrations" / "012_drive_folder_foundation.sql"
+_MIGRATION_013 = Path(__file__).parent.parent / "migrations" / "013_ist_rechnungen_migration.sql"
 
 
 def get_connection() -> sqlite3.Connection:
@@ -334,6 +338,211 @@ def _run_migration_projekte_polish(conn: sqlite3.Connection) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_touchpoint_project ON touchpoint(project_id)")
         conn.commit()
 
+
+# CRM-070 guard column for audit_log rebuild
+def _audit_log_has_link_drive(conn: sqlite3.Connection) -> bool:
+    """Prüft ob LINK_DRIVE bereits im audit_log CHECK-Constraint steht."""
+    try:
+        conn.execute("INSERT INTO audit_log (user, entity_type, entity_id, action) VALUES ('_test','_test',0,'LINK_DRIVE')")
+        conn.execute("DELETE FROM audit_log WHERE entity_type='_test' AND action='LINK_DRIVE'")
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def _run_migration_drive_folder_foundation(conn: sqlite3.Connection) -> None:
+    """
+    Migration 012: Drive-Folder-Felder in project + audit_log LINK_DRIVE Erweiterung.
+    CRM-062 + CRM-070 | Sprint 4 | 2026-05-20.
+    Idempotent via _column_exists + _audit_log_has_link_drive.
+    """
+    _MIGRATION_012 = Path(__file__).parent.parent / "migrations" / "012_drive_folder_foundation.sql"
+
+    changed = False
+
+    # CRM-062: Drive-Spalten in project
+    if not _column_exists(conn, "project", "drive_folder_id"):
+        conn.execute("ALTER TABLE project ADD COLUMN drive_folder_id   TEXT")
+        changed = True
+    if not _column_exists(conn, "project", "drive_folder_name"):
+        conn.execute("ALTER TABLE project ADD COLUMN drive_folder_name TEXT")
+        changed = True
+    if not _column_exists(conn, "project", "drive_folder_url"):
+        conn.execute("ALTER TABLE project ADD COLUMN drive_folder_url  TEXT")
+        changed = True
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_project_drive_folder_id ON project(drive_folder_id)")
+    if changed:
+        conn.commit()
+
+    # CRM-070: audit_log CHECK-Constraint erweitern (Table-Rebuild wenn nötig)
+    if not _audit_log_has_link_drive(conn):
+        conn.executescript("""
+CREATE TABLE audit_log_new (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp       TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    user            TEXT    NOT NULL DEFAULT 'system',
+    entity_type     TEXT    NOT NULL,
+    entity_id       INTEGER NOT NULL,
+    action          TEXT    NOT NULL CHECK(action IN ('CREATE', 'UPDATE', 'DELETE', 'LINK_DRIVE', 'WON_CELEBRATION')),
+    changed_fields  TEXT,
+    ip_address      TEXT,
+    created_at      TEXT
+);
+INSERT INTO audit_log_new
+    (id, timestamp, user, entity_type, entity_id, action, changed_fields, ip_address)
+SELECT id, timestamp, user, entity_type, entity_id, action, changed_fields, ip_address
+FROM audit_log;
+DROP TABLE audit_log;
+ALTER TABLE audit_log_new RENAME TO audit_log;
+CREATE INDEX IF NOT EXISTS idx_audit_entity    ON audit_log(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
+        """)
+        conn.commit()
+
+
+def _run_migration_ist_rechnungen(conn: sqlite3.Connection) -> None:
+    """
+    Migration 013: ist_rechnungen Legacy-Werte in project_rechnung migrieren.
+    Kenny-Backlog Item 4 | Sprint 4 | 2026-05-20.
+    Idempotent: nur Projekte ohne existierende project_rechnung-Einträge.
+    Setzt Migration 011 (project_rechnung Tabelle) voraus.
+    """
+    if not _table_exists(conn, "project_rechnung"):
+        return  # Migration 011 noch nicht gelaufen
+
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+    rows = conn.execute(
+        """SELECT id, ist_rechnungen FROM project
+           WHERE ist_rechnungen > 0 AND deleted_at IS NULL
+             AND NOT EXISTS (SELECT 1 FROM project_rechnung pr WHERE pr.project_id = project.id)"""
+    ).fetchall()
+
+    for row in rows:
+        conn.execute(
+            """INSERT INTO project_rechnung (project_id, datum, betrag, notiz, status, created_at)
+               VALUES (?, ?, ?, 'Migration aus Legacy-Feld ist_rechnungen', 'offen', ?)""",
+            (row["id"], ts, row["ist_rechnungen"], ts)
+        )
+        # Audit-Log für jede Migration (LINK_DRIVE noch nicht verfügbar, UPDATE verwenden)
+        conn.execute(
+            """INSERT INTO audit_log (user, entity_type, entity_id, action, changed_fields, ip_address)
+               VALUES ('system', 'project_rechnung', ?, 'CREATE', ?, NULL)""",
+            (row["id"],
+             json.dumps({"migration": "013_ist_rechnungen",
+                         "betrag": row["ist_rechnungen"],
+                         "project_id": row["id"]}, ensure_ascii=False))
+        )
+
+    if rows:
+        conn.commit()
+
+
+
+
+def _audit_log_has_link_drive(conn):
+    """Prüft ob LINK_DRIVE bereits im audit_log CHECK-Constraint steht (idempotent)."""
+    try:
+        conn.execute(
+            "INSERT INTO audit_log (user, entity_type, entity_id, action) VALUES (?, ?, ?, ?)",
+            ('_probe', '_probe', 0, 'LINK_DRIVE')
+        )
+        conn.execute("DELETE FROM audit_log WHERE entity_type='_probe' AND action='LINK_DRIVE'")
+        return True
+    except Exception:
+        return False
+
+
+def _run_migration_drive_folder_foundation(conn):
+    """
+    Migration 012: Drive-Folder-Felder in project + audit_log LINK_DRIVE Erweiterung.
+    CRM-062 + CRM-070 | Sprint 4 | 2026-05-20.
+    Idempotent via _column_exists + probe-Insert.
+    """
+    changed = False
+
+    # CRM-062: Drive-Spalten in project
+    if not _column_exists(conn, "project", "drive_folder_id"):
+        conn.execute("ALTER TABLE project ADD COLUMN drive_folder_id   TEXT")
+        changed = True
+    if not _column_exists(conn, "project", "drive_folder_name"):
+        conn.execute("ALTER TABLE project ADD COLUMN drive_folder_name TEXT")
+        changed = True
+    if not _column_exists(conn, "project", "drive_folder_url"):
+        conn.execute("ALTER TABLE project ADD COLUMN drive_folder_url  TEXT")
+        changed = True
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_project_drive_folder_id ON project(drive_folder_id)")
+    if changed:
+        conn.commit()
+
+    # CRM-070: audit_log CHECK-Constraint um LINK_DRIVE erweitern (Table-Rebuild wenn nötig)
+    if not _audit_log_has_link_drive(conn):
+        conn.executescript("""
+CREATE TABLE audit_log_new (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp       TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    user            TEXT    NOT NULL DEFAULT 'system',
+    entity_type     TEXT    NOT NULL,
+    entity_id       INTEGER NOT NULL,
+    action          TEXT    NOT NULL CHECK(action IN ('CREATE', 'UPDATE', 'DELETE', 'LINK_DRIVE', 'WON_CELEBRATION')),
+    changed_fields  TEXT,
+    ip_address      TEXT,
+    created_at      TEXT
+);
+INSERT INTO audit_log_new
+    (id, timestamp, user, entity_type, entity_id, action, changed_fields, ip_address)
+SELECT id, timestamp, user, entity_type, entity_id, action, changed_fields, ip_address
+FROM audit_log;
+DROP TABLE audit_log;
+ALTER TABLE audit_log_new RENAME TO audit_log;
+CREATE INDEX IF NOT EXISTS idx_audit_entity    ON audit_log(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
+""")
+        conn.commit()
+
+
+def _run_migration_ist_rechnungen(conn):
+    """
+    Migration 013: ist_rechnungen Legacy-Werte in project_rechnung migrieren.
+    Kenny-Backlog Item 4 | Sprint 4 | 2026-05-20.
+    Idempotent: nur Projekte ohne existierende project_rechnung-Einträge.
+    Setzt Migration 011 (project_rechnung Tabelle) voraus.
+    """
+    import json as _json
+    from datetime import datetime, timezone
+
+    if not _table_exists(conn, "project_rechnung"):
+        return  # Migration 011 noch nicht gelaufen
+
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+    rows = conn.execute(
+        """SELECT id, ist_rechnungen FROM project
+           WHERE ist_rechnungen > 0 AND deleted_at IS NULL
+             AND NOT EXISTS (SELECT 1 FROM project_rechnung pr WHERE pr.project_id = project.id)"""
+    ).fetchall()
+
+    for row in rows:
+        conn.execute(
+            """INSERT INTO project_rechnung (project_id, datum, betrag, notiz, status, created_at)
+               VALUES (?, ?, ?, ?, 'offen', ?)""",
+            (row["id"], ts, row["ist_rechnungen"],
+             "Migration aus Legacy-Feld ist_rechnungen", ts)
+        )
+        conn.execute(
+            """INSERT INTO audit_log (user, entity_type, entity_id, action, changed_fields, ip_address)
+               VALUES ('system', 'project_rechnung', ?, 'CREATE', ?, NULL)""",
+            (row["id"],
+             _json.dumps({"migration": "013_ist_rechnungen",
+                          "betrag": row["ist_rechnungen"],
+                          "project_id": row["id"]}, ensure_ascii=False))
+        )
+
+    if rows:
+        conn.commit()
+
 def init_db() -> None:
     """
     Legt alle Tabellen an falls noch nicht vorhanden.
@@ -357,6 +566,8 @@ def init_db() -> None:
         _run_migration_saved_view(conn)
         _run_migration_lost_competitor(conn)
         _run_migration_projekte_polish(conn)
+        _run_migration_drive_folder_foundation(conn)
+        _run_migration_ist_rechnungen(conn)
     finally:
         conn.close()
 

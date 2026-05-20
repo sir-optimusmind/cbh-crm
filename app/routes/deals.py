@@ -129,7 +129,7 @@ def _enrich_deal(row, conn) -> dict:
 
     # Projekt laden wenn vorhanden
     proj = conn.execute(
-        "SELECT id, name, status FROM project WHERE deal_id=? AND deleted_at IS NULL", (d["id"],)
+        "SELECT id, name, status, drive_folder_id, drive_folder_name, drive_folder_url FROM project WHERE deal_id=? AND deleted_at IS NULL", (d["id"],)
     ).fetchone()
     d["project"] = dict(proj) if proj else None
 
