@@ -247,3 +247,24 @@
 /* Date input dark mode */
 [data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; }
 [data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator { filter: none; opacity: 0.6; }
+
+/* ── Account: User-Zeilen (Sprint 3 Wave 3 CRM-051) ──────────── */
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 10px 0 12px;
+  border-radius: 0 5px 5px 0;
+  transition: background 0.1s;
+}
+.user-row--current:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ── Avatar Presence-Ringe (1:1 ColdCall) ─────────────────────── */
+.user-avatar[data-presence="online"]  { outline: 2px solid #34D399; outline-offset: 2px; }
+.user-avatar[data-presence="away"]    { outline: 2px solid #6B7280; outline-offset: 2px; }
+.user-avatar[data-presence="offline"] { outline: none; }
+/* Aktuell eingeloggter User: gelber Ring hat Vorrang vor Online-Status */
+.user-avatar[data-is-current="true"]  { outline: 2px solid var(--accent-yellow); outline-offset: 2px; }

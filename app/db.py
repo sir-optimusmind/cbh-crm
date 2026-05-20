@@ -25,6 +25,7 @@ _MIGRATION_002 = Path(__file__).parent.parent / "migrations" / "002_stimmung_fie
 _MIGRATION_003 = Path(__file__).parent.parent / "migrations" / "002_sprint2_schema.sql"
 _MIGRATION_004 = Path(__file__).parent.parent / "migrations" / "003_vision_fields.sql"
 _MIGRATION_005 = Path(__file__).parent.parent / "migrations" / "004_user_allowlist.sql"
+_MIGRATION_006 = Path(__file__).parent.parent / "migrations" / "005_presence.sql"
 
 
 def get_connection() -> sqlite3.Connection:
@@ -205,6 +206,32 @@ def _run_migration_user_allowlist(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
+def _run_migration_presence(conn: sqlite3.Connection) -> None:
+    """
+    Migration 005: last_seen_at auf crm_user fuer Presence-Tracking.
+    Idempotent via _migration_005_guard + _column_exists.
+    """
+    guard_exists = _table_exists(conn, "_migration_005_guard")
+    if guard_exists:
+        already = conn.execute(
+            "SELECT 1 FROM _migration_005_guard WHERE applied='005_presence'"
+        ).fetchone()
+        if already:
+            # Guard schon gesetzt – trotzdem Spalte prüfen (Sicherheitsnetz)
+            if not _column_exists(conn, "crm_user", "last_seen_at"):
+                conn.execute("ALTER TABLE crm_user ADD COLUMN last_seen_at TEXT")
+                conn.commit()
+            return
+
+    if not _column_exists(conn, "crm_user", "last_seen_at"):
+        conn.execute("ALTER TABLE crm_user ADD COLUMN last_seen_at TEXT")
+
+    if _MIGRATION_006.exists():
+        conn.executescript(_MIGRATION_006.read_text(encoding="utf-8"))
+
+    conn.commit()
+
+
 def init_db() -> None:
     """
     Legt alle Tabellen an falls noch nicht vorhanden.
@@ -222,6 +249,7 @@ def init_db() -> None:
         _run_migration_sprint2(conn)
         _run_migration_vision(conn)
         _run_migration_user_allowlist(conn)
+        _run_migration_presence(conn)
     finally:
         conn.close()
 

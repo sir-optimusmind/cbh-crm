@@ -171,61 +171,272 @@
 
   </nav>
 
-  <!-- Sticky Footer: Divider + Account-Section -->
-  <div style="padding-bottom: 12px; flex-shrink: 0;">
+  <!-- Sticky Footer: Team-Account-Block (Sprint 3 Wave 3 CRM-051) -->
+  <div style="padding-bottom: 12px; flex-shrink: 0; position: relative;" id="account-footer">
 
     <!-- Divider -->
-    <div style="height: 1px; background: var(--border-sub); margin: 4px 12px 12px;"></div>
+    <div style="height: 1px; background: var(--border-sub); margin: 4px 12px 10px;"></div>
 
-    <!-- SECTION: ACCOUNT -->
-    <div class="section-label" style="margin-top: 0; margin-bottom: 6px;">
-      Account
-    </div>
+    <!-- Section Label -->
+    <div class="section-label" style="margin-top: 0; margin-bottom: 4px;">Team</div>
 
-    <!-- Settings -->
-    {% set set_active = active_key == 'settings' %}
-    <a href="{{ prefix }}/settings"
-       class="nav-item{% if set_active %} is-active{% endif %}"
-       style="display: flex; align-items: center; gap: 8px;
-              height: 38px; padding: 0 12px; margin-bottom: 2px;
-              font-size: 13px; font-weight: 600; text-decoration: none;
-              border-radius: 0 5px 5px 0;
-              {% if set_active %}color: var(--text-primary); background: rgba(255,251,118,0.05); border-left: 2px solid var(--accent-yellow);
-              {% else %}color: var(--text-muted); background: transparent; border-left: 2px solid transparent;{% endif %}"
-       {% if not set_active %}
-       onmouseover="this.style.color='var(--text-primary)'; this.style.background='rgba(255,255,255,0.04)'"
-       onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'"
-       {% endif %}>
-      <!-- Feather: settings -->
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-           fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-      </svg>
-      <span>Einstellungen</span>
-    </a>
+    <!-- User-Zeilen -->
+    {% if all_users %}
+      {% for u in all_users %}
+      <div class="user-row{% if u.is_current %} user-row--current{% endif %}"
+           {% if u.is_current %}
+             id="account-panel-trigger"
+             onclick="toggleAccountPanel()"
+             role="button"
+             aria-expanded="false"
+             style="cursor: pointer;"
+           {% endif %}>
 
-    <!-- Logout -->
-    <form action="{{ prefix }}/auth/logout" method="post" style="display: block; margin: 0;">
-      <button type="submit"
-              style="display: flex; align-items: center; gap: 8px;
-                     width: 100%; height: 38px; padding: 0 12px; margin-bottom: 2px;
-                     font-family: 'Barlow', sans-serif; font-size: 13px; font-weight: 600;
-                     color: var(--text-muted); background: transparent; border: none;
-                     border-left: 2px solid transparent; border-radius: 0 5px 5px 0;
-                     cursor: pointer; text-align: left;
-                     transition: color 0.12s, background 0.12s;"
-              onmouseover="this.style.color='var(--text-primary)'; this.style.background='rgba(255,255,255,0.04)'"
-              onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'">
-        <!-- Feather: log-out -->
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-             fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-          <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-        </svg>
-        <span>Abmelden</span>
-      </button>
-    </form>
+        <!-- Avatar -->
+        <div class="user-avatar"
+             data-presence="{{ presence.get(u.slug, 'offline') }}"
+             {% if u.is_current %}data-is-current="true"{% endif %}
+             style="width:28px; height:28px; border-radius:50%;
+                    flex-shrink:0; overflow:hidden;
+                    display:flex; align-items:center; justify-content:center;
+                    font-size:11px; font-weight:700; color:#fff;
+                    background: {{ u.color }};">
+          {% if u.avatar_url %}
+            <img src="{{ u.avatar_url }}" alt="{{ u.initials }}"
+                 style="width:100%; height:100%; object-fit:cover;"
+                 onerror="this.style.display='none'; this.parentNode.textContent='{{ u.initials }}'">
+          {% else %}
+            {{ u.initials }}
+          {% endif %}
+        </div>
 
-  </div>
+        <!-- Name + Rolle -->
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:13px; font-weight:600;
+                      color:{% if u.is_current %}var(--text-primary){% else %}var(--text-muted){% endif %};
+                      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            {{ u.display_name }}
+          </div>
+          {% if u.is_current %}
+          <div style="font-size:10px; color:var(--text-muted); letter-spacing:0.04em;">
+            {{ u.role }}
+          </div>
+          {% endif %}
+        </div>
+
+      </div>
+      {% endfor %}
+    {% else %}
+      {# Fallback wenn all_users leer (z.B. DB-Fehler) #}
+      {% if current_user %}
+      <div class="user-row user-row--current"
+           id="account-panel-trigger"
+           onclick="toggleAccountPanel()"
+           role="button"
+           aria-expanded="false"
+           style="cursor: pointer;">
+        <div class="user-avatar"
+             data-presence="online"
+             data-is-current="true"
+             style="width:28px; height:28px; border-radius:50%;
+                    flex-shrink:0; display:flex; align-items:center; justify-content:center;
+                    font-size:11px; font-weight:700; color:#fff;
+                    background: var(--accent-blue);">
+          {{ current_user.initials }}
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:13px; font-weight:600; color:var(--text-primary);
+                      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            {{ current_user.display_name }}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    {% endif %}
+
+    <!-- Settings-Panel (Dropdown, öffnet nach oben) -->
+    <div id="account-panel"
+         style="display:none; position:absolute; bottom:calc(100% + 8px); left:12px;
+                width:260px; background:var(--bg-card);
+                border:1px solid var(--border); border-radius:10px;
+                padding:16px; box-shadow:0 -8px 24px rgba(0,0,0,0.35); z-index:1000;">
+
+      <!-- Header: Avatar + Name + E-Mail -->
+      {% if current_user %}
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+        <div style="position:relative; flex-shrink:0;">
+          {% set cur_slug = current_user.email.split('@')[0] | lower %}
+          {% set cur_avatar = prefix + '/static/avatars/' + cur_slug + '.png' %}
+          <div style="width:80px; height:80px; border-radius:50%; overflow:hidden;
+                      display:flex; align-items:center; justify-content:center;
+                      font-size:24px; font-weight:700; color:#fff;
+                      background:var(--accent-blue);"
+               id="account-panel-avatar-wrap">
+            <img id="account-panel-avatar-img"
+                 src="{{ cur_avatar }}"
+                 alt="{{ current_user.initials }}"
+                 style="width:100%; height:100%; object-fit:cover;"
+                 onerror="this.style.display='none'; document.getElementById('account-panel-avatar-initials').style.display='flex'">
+            <span id="account-panel-avatar-initials"
+                  style="display:none; position:absolute; inset:0;
+                         align-items:center; justify-content:center;
+                         font-size:24px; font-weight:700; color:#fff;">
+              {{ current_user.initials }}
+            </span>
+          </div>
+        </div>
+        <div style="min-width:0;">
+          <div style="font-size:14px; font-weight:700; color:var(--text-primary);
+                      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            {{ current_user.display_name }}
+          </div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">
+            {{ current_user.email }}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Divider -->
+      <div style="height:1px; background:var(--border-sub); margin:0 0 14px;"></div>
+
+      <!-- Theme-Switcher -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.1em;
+                    text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">
+          Theme
+        </div>
+        <div class="theme-switcher" style="width:100%; justify-content:space-between;">
+          <button onclick="applyTheme('dark')"  data-theme-btn="dark"  id="sp-theme-dark">Dunkel</button>
+          <button onclick="applyTheme('system')" data-theme-btn="system" id="sp-theme-system">System</button>
+          <button onclick="applyTheme('light')" data-theme-btn="light" id="sp-theme-light">Hell</button>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div style="height:1px; background:var(--border-sub); margin:0 0 14px;"></div>
+
+      <!-- Avatar-Upload -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.1em;
+                    text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">
+          Avatar
+        </div>
+        <div id="avatar-upload-status" style="display:none; font-size:12px; margin-bottom:8px;"></div>
+        <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <input type="file" id="avatar-file-input" accept=".jpg,.jpeg,.png"
+                 style="display:none;" onchange="uploadAvatar(this)">
+          <button type="button"
+                  onclick="document.getElementById('avatar-file-input').click()"
+                  style="font-family:'Barlow',sans-serif; font-size:12px; font-weight:600;
+                         color:var(--text-muted); background:var(--bg-input);
+                         border:1px solid var(--border); border-radius:6px;
+                         padding:6px 12px; cursor:pointer; white-space:nowrap;">
+            Bild wählen
+          </button>
+          <span style="font-size:11px; color:var(--text-muted);">JPG/PNG, max 2 MB</span>
+        </label>
+      </div>
+
+      <!-- Divider -->
+      <div style="height:1px; background:var(--border-sub); margin:0 0 14px;"></div>
+
+      <!-- Logout -->
+      <form action="{{ prefix }}/auth/logout" method="post" style="margin:0;">
+        <button type="submit"
+                style="display:flex; align-items:center; gap:8px; width:100%;
+                       font-family:'Barlow',sans-serif; font-size:13px; font-weight:600;
+                       color:var(--status-error); background:transparent;
+                       border:1px solid transparent; border-radius:6px;
+                       padding:8px 10px; cursor:pointer; text-align:left;
+                       transition:background 0.12s, border-color 0.12s;"
+                onmouseover="this.style.background='rgba(239,68,68,0.1)'; this.style.borderColor='var(--status-error)'"
+                onmouseout="this.style.background='transparent'; this.style.borderColor='transparent'">
+          <!-- Feather: log-out -->
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Abmelden
+        </button>
+      </form>
+
+    </div><!-- /#account-panel -->
+
+  </div><!-- /#account-footer -->
 </aside>
+
+<!-- Account-Panel JS -->
+<script>
+(function() {
+  var panel = document.getElementById('account-panel');
+  var trigger = document.getElementById('account-panel-trigger');
+
+  function toggleAccountPanel() {
+    if (!panel) return;
+    var isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : 'block';
+    if (trigger) trigger.setAttribute('aria-expanded', String(!isOpen));
+    // Theme-Button Active-State synchronisieren
+    if (!isOpen) {
+      var saved = localStorage.getItem('cbh-theme') || 'dark';
+      document.querySelectorAll('[data-theme-btn]').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.themeBtn === saved);
+      });
+    }
+  }
+  window.toggleAccountPanel = toggleAccountPanel;
+
+  // Klick außerhalb → Panel schließen
+  document.addEventListener('click', function(e) {
+    if (!panel || panel.style.display === 'none') return;
+    var footer = document.getElementById('account-footer');
+    if (footer && !footer.contains(e.target)) {
+      panel.style.display = 'none';
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  // Avatar-Upload
+  window.uploadAvatar = function(input) {
+    var file = input.files[0];
+    if (!file) return;
+    var status = document.getElementById('avatar-upload-status');
+    status.style.display = 'block';
+    status.style.color = 'var(--text-muted)';
+    status.textContent = 'Wird hochgeladen...';
+
+    var formData = new FormData();
+    formData.append('avatar_file', file);
+
+    fetch(window._prefix + '/auth/avatar/upload', {
+      method: 'POST',
+      body: formData,
+      credentials: 'same-origin'
+    })
+    .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+    .then(function(res) {
+      if (res.ok && res.data.ok) {
+        status.style.color = 'var(--status-success)';
+        status.textContent = 'Avatar aktualisiert.';
+        // Avatare im Panel + Sidebar sofort aktualisieren (cache-bust)
+        var bust = '?t=' + Date.now();
+        var panelImg = document.getElementById('account-panel-avatar-img');
+        if (panelImg) { panelImg.src = window._prefix + res.data.url + bust; panelImg.style.display = ''; }
+        document.querySelectorAll('.user-avatar[data-is-current="true"] img').forEach(function(img) {
+          img.src = window._prefix + res.data.url + bust;
+          img.style.display = '';
+        });
+      } else {
+        status.style.color = 'var(--status-error)';
+        status.textContent = res.data.error || 'Upload fehlgeschlagen.';
+      }
+    })
+    .catch(function() {
+      status.style.color = 'var(--status-error)';
+      status.textContent = 'Netzwerkfehler.';
+    });
+  };
+})();
+</script>

@@ -11,18 +11,21 @@ Ablauf:
   POST /auth/logout     → Session leeren, Redirect zu /auth/login
 """
 
+import io
 import json
 import os
 import logging
+import struct
 from datetime import datetime, timezone
+from pathlib import Path
 
 from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
-from fastapi import APIRouter, Request
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi import APIRouter, Request, UploadFile, File
+from fastapi.responses import RedirectResponse, HTMLResponse, Response, JSONResponse
 
-from app.db import get_connection
+from app.db import get_connection, write_audit_log
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +62,7 @@ SESSION_MAX_AGE = int(os.getenv("SESSION_MAX_AGE", str(14 * 24 * 3600)))
 # Callback-URL – aus .env oder Default
 OAUTH_CALLBACK_URL = os.getenv(
     "OAUTH_CALLBACK_URL",
-    "https://hook.srv960331.hstgr.cloud/mission-ctrl/auth/callback"
+    "https://hook.srv960331.hstgr.cloud/mission-ctrl/crm-staging/auth/callback"
 )
 
 # APP_PREFIX – wo die App gemountet ist (kein trailing slash)
@@ -316,3 +319,140 @@ async def logout_get(request: Request):
         _write_login_audit(user.get("email", "unknown"), "LOGOUT", ip)
     request.session.clear()
     return RedirectResponse(url=f"{APP_PREFIX}/auth/login", status_code=302)
+
+
+# ─── Heartbeat-Endpoint ───────────────────────────────────────────────────────
+
+@router.post("/auth/heartbeat")
+async def heartbeat(request: Request):
+    """
+    POST /auth/heartbeat – Aktualisiert last_seen_at für den eingeloggten User.
+    Wird vom Frontend alle 30s gepollt.
+    Returns 204 No Content.
+    """
+    user = get_current_user(request)
+    if not user:
+        return Response(status_code=401)
+
+    email = user.get("email", "")
+    if not email:
+        return Response(status_code=400)
+
+    conn = get_connection()
+    try:
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        conn.execute(
+            "UPDATE crm_user SET last_seen_at=? WHERE email=?",
+            (now, email)
+        )
+        conn.commit()
+    except Exception as exc:
+        logger.warning("heartbeat UPDATE failed: %s", exc)
+    finally:
+        conn.close()
+
+    return Response(status_code=204)
+
+
+# ─── Avatar-Upload-Endpoint ───────────────────────────────────────────────────
+
+_AVATAR_DIR = Path(os.path.dirname(os.path.abspath(__file__))) / "static" / "avatars"
+_AVATAR_MAX_BYTES = 2 * 1024 * 1024  # 2 MB
+
+# Magic Bytes: PNG = \x89PNG, JPEG = \xFF\xD8\xFF
+_MAGIC_JPEG = bytes([0xFF, 0xD8, 0xFF])
+_MAGIC_PNG  = bytes([0x89, 0x50, 0x4E, 0x47])
+
+
+def _check_image_magic(data: bytes) -> str | None:
+    """
+    Prüft Magic Bytes (nicht Content-Type).
+    Gibt 'jpeg' oder 'png' zurück, oder None wenn ungültig.
+    """
+    if data[:4] == _MAGIC_PNG:
+        return "png"
+    if data[:3] == _MAGIC_JPEG:
+        return "jpeg"
+    return None
+
+
+@router.post("/auth/avatar/upload")
+async def avatar_upload(request: Request, avatar_file: UploadFile = File(...)):
+    """
+    POST /auth/avatar/upload – Avatar-Upload für eingeloggten User.
+    - Magic-Bytes-Validation (kein Content-Type-Trust)
+    - Max 2 MB
+    - Resize auf 200x200px (Pillow)
+    - Dateiname IMMER aus current_user.email abgeleitet (Path Traversal unmöglich)
+    - Audit-Log Eintrag
+    """
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "Nicht eingeloggt"}, status_code=401)
+
+    email = user.get("email", "")
+    if not email:
+        return JSONResponse({"error": "Kein User"}, status_code=400)
+
+    ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+
+    # Datei lesen (mit Größenlimit)
+    raw = await avatar_file.read(_AVATAR_MAX_BYTES + 1)
+    if len(raw) > _AVATAR_MAX_BYTES:
+        return JSONResponse({"error": "Datei zu groß. Maximum: 2 MB."}, status_code=413)
+
+    # Magic-Bytes prüfen
+    img_type = _check_image_magic(raw)
+    if img_type is None:
+        return JSONResponse({"error": "Nur JPEG und PNG erlaubt."}, status_code=415)
+
+    # Pillow: Resize auf 200x200
+    try:
+        from PIL import Image
+        img = Image.open(io.BytesIO(raw))
+        img = img.convert("RGB")  # EXIF entfernen, Farbraum normalisieren
+        img.thumbnail((200, 200), Image.LANCZOS)
+        # Auf 200x200 croppen (zentriert)
+        if img.size != (200, 200):
+            new_img = Image.new("RGB", (200, 200), (30, 30, 30))
+            offset_x = (200 - img.width) // 2
+            offset_y = (200 - img.height) // 2
+            new_img.paste(img, (offset_x, offset_y))
+            img = new_img
+    except Exception as exc:
+        logger.warning("Pillow Fehler beim Avatar-Resize: %s", exc)
+        return JSONResponse({"error": "Bild konnte nicht verarbeitet werden."}, status_code=422)
+
+    # Slug aus E-Mail ableiten (sicher, kein Client-Input)
+    import re
+    slug = re.sub(r"[^a-z0-9]", "", email.split("@")[0].lower())
+    if not slug:
+        return JSONResponse({"error": "Ungültige E-Mail."}, status_code=400)
+
+    # Speichern (immer als .png, einheitlich)
+    dest = _AVATAR_DIR / f"{slug}.png"
+    _AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    dest.write_bytes(buf.getvalue())
+
+    # Audit-Log
+    conn = get_connection()
+    try:
+        write_audit_log(
+            conn,
+            user=email,
+            entity_type="crm_user",
+            entity_id=0,
+            action="AVATAR_UPLOAD",
+            changed_fields={"slug": slug, "bytes": len(raw)},
+            ip_address=ip,
+        )
+        conn.commit()
+    except Exception as exc:
+        logger.warning("Audit-Log für Avatar-Upload fehlgeschlagen: %s", exc)
+    finally:
+        conn.close()
+
+    logger.info("Avatar-Upload OK: %s → %s", email, dest)
+    return JSONResponse({"ok": True, "url": f"/static/avatars/{slug}.png"})

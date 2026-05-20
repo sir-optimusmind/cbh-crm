@@ -187,6 +187,25 @@
     })();
   </script>
 
+  <!-- Prefix für JS (Heartbeat, Avatar-Upload) -->
+  <script>window._prefix = "{{ prefix }}";</script>
+
+  <!-- Heartbeat: alle 30s last_seen_at updaten (nur wenn eingeloggt) -->
+  {% if current_user and current_user.email %}
+  <script>
+  (function() {
+    function sendHeartbeat() {
+      fetch(window._prefix + '/auth/heartbeat', {
+        method: 'POST',
+        credentials: 'same-origin'
+      }).catch(function() {}); // Fehler stillschweigend ignorieren
+    }
+    sendHeartbeat();
+    setInterval(sendHeartbeat, 30000);
+  })();
+  </script>
+  {% endif %}
+
   {% block scripts %}{% endblock %}
 </body>
 </html>
