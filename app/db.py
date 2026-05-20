@@ -26,6 +26,8 @@ _MIGRATION_003 = Path(__file__).parent.parent / "migrations" / "002_sprint2_sche
 _MIGRATION_004 = Path(__file__).parent.parent / "migrations" / "003_vision_fields.sql"
 _MIGRATION_005 = Path(__file__).parent.parent / "migrations" / "004_user_allowlist.sql"
 _MIGRATION_006 = Path(__file__).parent.parent / "migrations" / "005_presence.sql"
+_MIGRATION_007 = Path(__file__).parent.parent / "migrations" / "006_stage_history.sql"
+_MIGRATION_008 = Path(__file__).parent.parent / "migrations" / "007_verlust_reason_enum.sql"
 
 
 def get_connection() -> sqlite3.Connection:
@@ -232,6 +234,31 @@ def _run_migration_presence(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _run_migration_stage_history(conn: sqlite3.Connection) -> None:
+    """
+    Migration 006: deal_stage_history Tabelle + Indizes.
+    CRM-055 | Sprint 3 Wave 3b.
+    Idempotent via _table_exists-Check.
+    """
+    if _table_exists(conn, "deal_stage_history"):
+        return
+    if _MIGRATION_007.exists():
+        conn.executescript(_MIGRATION_007.read_text(encoding="utf-8"))
+        conn.commit()
+
+
+def _run_migration_verlust_enum(conn: sqlite3.Connection) -> None:
+    """
+    Migration 007: verlust_reason_enum Spalte in deal.
+    CRM-054 | Sprint 3 Wave 3b.
+    Idempotent via _column_exists.
+    """
+    if not _column_exists(conn, "deal", "verlust_reason_enum"):
+        conn.execute("ALTER TABLE deal ADD COLUMN verlust_reason_enum TEXT")
+        conn.commit()
+
+
+
 def init_db() -> None:
     """
     Legt alle Tabellen an falls noch nicht vorhanden.
@@ -250,6 +277,8 @@ def init_db() -> None:
         _run_migration_vision(conn)
         _run_migration_user_allowlist(conn)
         _run_migration_presence(conn)
+        _run_migration_stage_history(conn)
+        _run_migration_verlust_enum(conn)
     finally:
         conn.close()
 

@@ -159,14 +159,35 @@
     </div>
     <!-- Body -->
     <div style="padding:20px;">
+      <!-- CRM-054: Verlustgrund-Dropdown (Enum) -->
       <label style="display:block; font-size:12px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px;">
         Verlustgrund <span style="color:#DC2626;">*</span>
       </label>
-      <textarea id="lost-verlust-grund" name="verlust_grund" rows="3" required
-        placeholder="Min. 10 Zeichen – z.B. Preis, Wettbewerber, Timing, kein Budget..."
+      <select id="lost-reason-enum" name="verlust_reason_enum"
         style="width:100%; box-sizing:border-box; background:#252525; border:1px solid #333; border-radius:6px;
-               color:#F0F0F0; font-family:'Barlow',sans-serif; font-size:13px; padding:8px 10px;
-               resize:vertical; outline:none;"></textarea>
+               color:#F0F0F0; font-family:'Barlow',sans-serif; font-size:13px; padding:8px 10px; outline:none; cursor:pointer;">
+        <option value="">-- Bitte wählen --</option>
+        <option value="Budget zu klein">Budget zu klein</option>
+        <option value="Konkurrenz gewonnen">Konkurrenz gewonnen</option>
+        <option value="Kein Fit">Kein Fit</option>
+        <option value="Timing schlecht">Timing schlecht</option>
+        <option value="Intern entschieden">Intern entschieden</option>
+        <option value="Kein Entscheider erreicht">Kein Entscheider erreicht</option>
+        <option value="Andere">Andere</option>
+      </select>
+      <div id="lost-reason-enum-warning" style="display:none; color:#F59E0B; font-size:11px; margin-top:4px;">Bitte Verlustgrund wählen.</div>
+
+      <!-- Freitext: nur bei "Andere" sichtbar -->
+      <div id="lost-freitext-block" style="display:none; margin-top:10px;">
+        <label style="display:block; font-size:12px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px;">
+          Genauer Grund (Pflicht bei "Andere")
+        </label>
+        <textarea id="lost-verlust-grund" name="verlust_grund" rows="3"
+          placeholder="Min. 10 Zeichen..."
+          style="width:100%; box-sizing:border-box; background:#252525; border:1px solid #333; border-radius:6px;
+                 color:#F0F0F0; font-family:'Barlow',sans-serif; font-size:13px; padding:8px 10px;
+                 resize:vertical; outline:none;"></textarea>
+      </div>
       <div id="lost-grund-error" style="display:none; color:#FCA5A5; font-size:12px; margin-top:4px;"></div>
 
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;">
@@ -266,6 +287,9 @@ function openLostModal(dealId, card, fromCol, oldIndex) {
   _lostOldIndex = oldIndex;
 
   // Felder zuruecksetzen
+  document.getElementById('lost-reason-enum').value = '';
+  document.getElementById('lost-reason-enum-warning').style.display = 'none';
+  document.getElementById('lost-freitext-block').style.display = 'none';
   document.getElementById('lost-verlust-grund').value = '';
   document.getElementById('lost-competitor').value = '';
   document.getElementById('lost-retry-datum').value = '';
@@ -286,6 +310,14 @@ function closeLostModal(revert) {
   _lostOldIndex = null;
 }
 
+// CRM-054: Dropdown onChange - Freitext bei "Andere" anzeigen
+document.getElementById('lost-reason-enum').addEventListener('change', function() {
+  var val = this.value;
+  var freitext = document.getElementById('lost-freitext-block');
+  freitext.style.display = (val === 'Andere') ? 'block' : 'none';
+  document.getElementById('lost-reason-enum-warning').style.display = 'none';
+});
+
 document.getElementById('lost-cancel-btn').addEventListener('click', function() {
   closeLostModal(true);
 });
@@ -300,10 +332,21 @@ document.getElementById('lost-modal').addEventListener('cancel', function(e) {
 
 document.getElementById('lost-form').addEventListener('submit', function(e) {
   e.preventDefault();
+  var reasonEnum = document.getElementById('lost-reason-enum').value.trim();
   var grund = document.getElementById('lost-verlust-grund').value.trim();
   var errEl = document.getElementById('lost-grund-error');
+  var warnEl = document.getElementById('lost-reason-enum-warning');
 
-  if (!grund || grund.length < 10) {
+  // Validation: Enum-Auswahl Pflicht (Warning, kein Block)
+  if (!reasonEnum) {
+    warnEl.style.display = 'block';
+    // Weiter trotzdem erlaubt (spec: optional warning, kein block)
+  } else {
+    warnEl.style.display = 'none';
+  }
+
+  // Bei "Andere": Freitext Pflicht
+  if (reasonEnum === 'Andere' && (!grund || grund.length < 10)) {
     errEl.textContent = 'Bitte mindestens 10 Zeichen eingeben.';
     errEl.style.display = 'block';
     return;
@@ -316,7 +359,10 @@ document.getElementById('lost-form').addEventListener('submit', function(e) {
   submitBtn.disabled = true;
   submitBtn.textContent = 'Speichern...';
 
-  var body = {stage: 'lost', verlust_grund: grund};
+  var body = {stage: 'lost'};
+  if (reasonEnum) body.verlust_reason_enum = reasonEnum;
+  if (reasonEnum === 'Andere' && grund) body.verlust_grund = grund;
+  else if (reasonEnum && reasonEnum !== 'Andere') body.verlust_grund = reasonEnum;
   if (competitor) body.lost_competitor = competitor;
   if (retryDatum) body.retry_datum = retryDatum;
 

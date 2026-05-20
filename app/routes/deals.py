@@ -22,6 +22,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.db import get_connection, write_audit_log, now_iso
+from app.shared.stage_history import log_stage_history
 from app.template_utils import tmpl_ctx
 
 router = APIRouter()
@@ -36,6 +37,16 @@ STAGES_REQUIRING_BACKUP = ["new", "opportunity", "discovery", "proposal_sent", "
 PRODUCTS = ["race", "blindspot", "okr_training", "pm_training", "innovation_cell", "visionsworkshop", "empower_os", "tm", "other"]
 LEAD_SOURCES = ["linkedin", "email", "telefon", "lemlist", "cognism", "apollo", "networking", "referral", "other"]
 LEAD_TYPES = ["unknown_unknown", "lucky_deal", "inbound"]
+# CRM-054: Strukturierte Verlustgrunde (Enum)
+VERLUST_REASON_ENUM = [
+    "Budget zu klein",
+    "Konkurrenz gewonnen",
+    "Kein Fit",
+    "Timing schlecht",
+    "Intern entschieden",
+    "Kein Entscheider erreicht",
+    "Andere",
+]
 ICP_PERSONAS = ["forward_thinking_owner", "transformation_leader", "speed_optimizer", "rebels", "other"]
 
 
@@ -576,22 +587,32 @@ async def deal_stage_patch(request: Request, deal_id: int):
     new_stage = body.get("stage", "")
     # CRM-030: verlust_grund aus Body wenn stage=lost (Drag&Drop Modal)
     verlust_grund_body = body.get("verlust_grund", None)
+    # CRM-054: strukturierter Verlustgrund (Enum)
+    verlust_reason_enum_body = body.get("verlust_reason_enum", None)
+    # Validation: nur erlaubte Enum-Werte
+    if verlust_reason_enum_body is not None and verlust_reason_enum_body not in VERLUST_REASON_ENUM:
+        return JSONResponse({"error": f"Ungültiger verlust_reason_enum-Wert: {verlust_reason_enum_body}"}, status_code=422)
 
     if new_stage not in STAGES:
         return JSONResponse({"error": f"Ungültige Stage: {new_stage}"}, status_code=422)
 
     conn = get_connection()
     try:
+        # CRM-055: BEGIN IMMEDIATE – serialisiert parallele Stage-Wechsel (Niko-Pattern Sektion 6.2)
+        conn.execute("BEGIN IMMEDIATE")
+
         row = conn.execute(
             "SELECT * FROM deal WHERE id=? AND deleted_at IS NULL", (deal_id,)
         ).fetchone()
         if not row:
+            conn.rollback()
             return JSONResponse({"error": "Deal nicht gefunden"}, status_code=404)
 
         deal = dict(row)
         old_stage = deal["stage"]
 
         if old_stage in ("won", "lost"):
+            conn.rollback()
             return JSONResponse(
                 {"error": "Finalisierte Deals können nicht per Drag&Drop verschoben werden"},
                 status_code=422
@@ -607,20 +628,25 @@ async def deal_stage_patch(request: Request, deal_id: int):
             deal["projekt_start_datum"], effective_verlust_grund
         )
         if err:
+            conn.rollback()
             return JSONResponse({"error": err}, status_code=422)
 
         ts = now_iso()
-        if new_stage == "lost" and verlust_grund_body:
-            # CRM-030: verlust_grund direkt mit Stage-Wechsel persistieren
+        if new_stage == "lost":
+            # CRM-030 + CRM-054: verlust_grund + verlust_reason_enum persistieren
             conn.execute(
-                "UPDATE deal SET stage=?, verlust_grund=?, updated_at=? WHERE id=?",
-                (new_stage, effective_verlust_grund, ts, deal_id)
+                "UPDATE deal SET stage=?, verlust_grund=?, verlust_reason_enum=?, updated_at=? WHERE id=?",
+                (new_stage, effective_verlust_grund, verlust_reason_enum_body, ts, deal_id)
             )
         else:
             conn.execute(
                 "UPDATE deal SET stage=?, updated_at=? WHERE id=?",
                 (new_stage, ts, deal_id)
             )
+
+        # CRM-055: History-Eintrag in DERSELBEN Transaktion (atomar)
+        log_stage_history(conn, deal_id, old_stage, new_stage, user, ts)
+
         write_audit_log(conn, user=user, entity_type="deal", entity_id=deal_id,
                         action="UPDATE",
                         changed_fields={"stage": {"from": old_stage, "to": new_stage}},
