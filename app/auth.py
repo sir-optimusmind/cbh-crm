@@ -23,6 +23,7 @@ from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi import APIRouter, Request, UploadFile, File
+from app.shared.session_expiry import set_session_expiry, is_session_expired
 from fastapi.responses import RedirectResponse, HTMLResponse, Response, JSONResponse
 
 from app.db import get_connection, write_audit_log
@@ -159,32 +160,33 @@ _LOGIN_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>CBH MISSION CTRL – Login</title>
+  <title>Mission CTRL – Login</title>
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;900&display=swap" rel="stylesheet">
   <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{ background: #111111; color: #F0F0F0; font-family: 'Barlow', sans-serif;
            display: flex; align-items: center; justify-content: center; min-height: 100vh; }}
-    .login-box {{ background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px;
-                 padding: 48px 40px; max-width: 380px; width: 100%; text-align: center; }}
-    .brand {{ font-size: 11px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase;
-              color: #F0F0F0; margin-bottom: 4px; }}
-    .brand-sub {{ font-size: 18px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase;
-                  color: #FFFB76; margin-bottom: 32px; }}
+    .login-box {{ background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 14px;
+                 padding: 64px 56px; max-width: 480px; width: 100%; text-align: center; }}
+    .brand-pre {{ font-size: 11px; font-weight: 700; letter-spacing: 0.25em; text-transform: uppercase;
+                  color: #666; margin-bottom: 8px; }}
+    .brand-main {{ font-size: 32px; font-weight: 900; letter-spacing: 0.03em;
+                   color: #F0F0F0; margin-bottom: 36px; line-height: 1; }}
+    .brand-main span {{ color: #F0F0F0; }}
     .btn-google {{ display: flex; align-items: center; justify-content: center; gap: 10px;
-                   background: #FFFB76; color: #111111; font-weight: 700; font-size: 14px;
-                   padding: 12px 24px; border-radius: 8px; border: none; cursor: pointer;
-                   text-decoration: none; width: 100%; transition: background 0.15s; }}
-    .btn-google:hover {{ background: #f0ec60; }}
-    .hint {{ margin-top: 16px; font-size: 12px; color: #666; }}
+                   background: #111111; color: #F0F0F0; font-weight: 700; font-size: 15px;
+                   padding: 14px 28px; border-radius: 8px; border: 1px solid #333; cursor: pointer;
+                   text-decoration: none; width: 100%; transition: background 0.15s, border-color 0.15s; }}
+    .btn-google:hover {{ background: #1e1e1e; border-color: #555; }}
+    .hint {{ margin-top: 18px; font-size: 12px; color: #555; }}
     {error_style}
   </style>
 </head>
 <body>
   <div class="login-box">
-    <img src="{app_prefix}/static/brand/Symbol-white-transparent.svg" alt="CBH Rockfist" style="height:55px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto;">
-    <div class="brand">CBH</div>
-    <div class="brand-sub">MISSION CTRL</div>
+    <img src="{app_prefix}/static/brand/Symbol-yellow-transparent.svg" alt="CBH Rockfist" style="height:80px;margin-bottom:28px;display:block;margin-left:auto;margin-right:auto;">
+    <div class="brand-pre">CBH</div>
+    <div class="brand-main">Mission CTRL</div>
     {error_block}
     <a href="{login_url}" class="btn-google">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -243,9 +245,24 @@ _DENIED_HTML = """<!DOCTYPE html>
 
 @router.get("/auth/login")
 async def login(request: Request):
-    """Zeigt Login-Seite oder startet direkt OAuth-Flow."""
+    """Zeigt CBH-Startscreen. Wenn schon eingeloggt: Redirect zur Übersicht."""
+    # Schon eingeloggt? → zur Übersicht
+    if request.session.get("user"):
+        return RedirectResponse(url="/mission-ctrl/crm-staging/", status_code=302)
+    html = _LOGIN_HTML.format(
+        login_url=f"{APP_PREFIX}/auth/login/google",
+        app_prefix=APP_PREFIX,
+        error_style="",
+        error_block="",
+    )
+    return HTMLResponse(content=html)
+
+
+@router.get("/auth/login/google")
+async def login_google(request: Request):
+    """Startet OAuth-Flow nach aktivem Klick auf Login-Button."""
     redirect_uri = OAUTH_CALLBACK_URL
-    return await oauth.google.authorize_redirect(request, redirect_uri)
+    return await oauth.google.authorize_redirect(request, redirect_uri, prompt="select_account")
 
 
 @router.get("/auth/callback")
@@ -311,7 +328,7 @@ async def auth_callback(request: Request):
     next_url = request.session.pop("next", None)
     if next_url and next_url.startswith("/"):
         return RedirectResponse(url=next_url, status_code=302)
-    return RedirectResponse(url=f"{APP_PREFIX}/personen", status_code=302)
+    return RedirectResponse(url="/mission-ctrl/crm-staging/", status_code=302)  # Christian-Direktive: immer Übersicht
 
 
 @router.post("/auth/logout")
