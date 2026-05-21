@@ -41,11 +41,13 @@ def get_connection() -> sqlite3.Connection:
     Gibt eine SQLite-Verbindung zurueck.
     WAL-Mode und Foreign Keys sind aktiviert.
     row_factory = sqlite3.Row fuer dict-aehnlichen Zugriff.
+    busy_timeout=5000: wartet bis zu 5s bei locked DB, statt sofort OperationalError.
     """
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=5.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
 
@@ -543,6 +545,58 @@ def _run_migration_ist_rechnungen(conn):
     if rows:
         conn.commit()
 
+
+
+def _run_migration_kanban(conn: sqlite3.Connection) -> None:
+    """
+    Migration 014: MVG Bewerber-Kanban.
+    Legt kanban_config, kanban_columns, applicants, applicant_comments,
+    applicant_audit, magic_link Tabellen an (CREATE TABLE IF NOT EXISTS = idempotent).
+    Erweitert crm_user um allowed_modules und external_role.
+    """
+    # crm_user: allowed_modules (Modul-Scope für externe Partner)
+    if not _column_exists(conn, "crm_user", "allowed_modules"):
+        conn.execute("ALTER TABLE crm_user ADD COLUMN allowed_modules TEXT DEFAULT ''")
+        conn.commit()
+
+    # crm_user: external_role (NULL = CBH-intern, 'external_partner' = MVG-Partner)
+    # Umgeht CHECK-Constraint-Konflikt auf role-Spalte
+    if not _column_exists(conn, "crm_user", "external_role"):
+        conn.execute("ALTER TABLE crm_user ADD COLUMN external_role TEXT DEFAULT NULL")
+        conn.commit()
+
+    # crm_user: last_seen_at (falls noch nicht vorhanden – Migration 005/006 evtl. nicht gelaufen)
+    if not _column_exists(conn, "crm_user", "last_seen_at"):
+        conn.execute("ALTER TABLE crm_user ADD COLUMN last_seen_at TEXT DEFAULT NULL")
+        conn.commit()
+
+    # Kanban-Tabellen aus SQL-File
+    _MIGRATION_014 = Path(__file__).parent.parent / "migrations" / "014_kanban.sql"
+    if _MIGRATION_014.exists():
+        conn.executescript(_MIGRATION_014.read_text(encoding="utf-8"))
+        conn.commit()
+    else:
+        import logging
+        logging.getLogger(__name__).warning("Migration 014 SQL nicht gefunden: %s", _MIGRATION_014)
+
+def _run_migration_kanban_hardening(conn: sqlite3.Connection) -> None:
+    """
+    Migration 015: Kanban Audit Hardening.
+    K-BUG-004: DELETE-Trigger auf applicants (ISO append-only Garantie).
+    K-BUG-005: user_email Spalte in applicant_audit (Doku-Konsistenz).
+    Idempotent: CREATE TRIGGER IF NOT EXISTS + _column_exists.
+    """
+    _MIGRATION_015 = Path(__file__).parent.parent / "migrations" / "015_kanban_audit_hardening.sql"
+    if _MIGRATION_015.exists():
+        conn.executescript(_MIGRATION_015.read_text(encoding="utf-8"))
+        conn.commit()
+
+    # K-BUG-005: user_email Spalte in applicant_audit ergänzen
+    if not _column_exists(conn, "applicant_audit", "user_email"):
+        conn.execute("ALTER TABLE applicant_audit ADD COLUMN user_email TEXT")
+        conn.commit()
+
+
 def init_db() -> None:
     """
     Legt alle Tabellen an falls noch nicht vorhanden.
@@ -568,6 +622,8 @@ def init_db() -> None:
         _run_migration_projekte_polish(conn)
         _run_migration_drive_folder_foundation(conn)
         _run_migration_ist_rechnungen(conn)
+        _run_migration_kanban(conn)
+        _run_migration_kanban_hardening(conn)
     finally:
         conn.close()
 

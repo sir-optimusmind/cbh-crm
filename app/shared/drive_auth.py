@@ -20,6 +20,7 @@ import os
 import json
 import secrets
 import logging
+from html import escape
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
@@ -546,7 +547,7 @@ def _error_page(msg: str) -> str:
 <body>
   <div class="box">
     <h2>Verbindungsfehler</h2>
-    <p>{msg}</p>
+    <p>{escape(msg)}</p>
     <a href="{APP_PREFIX}/pipeline">Zurueck zur Pipeline</a>
   </div>
 </body>
