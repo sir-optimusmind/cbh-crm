@@ -56,7 +56,7 @@ NAV_ITEMS = [
     {"key": "coldcall", "label": "Cold Calling",  "path": f"{COLDCALL_STAGING_PREFIX}/", "icon": "phone"},
     {"key": "crm",      "label": "CRM",           "path": f"{APP_PREFIX}/personen",   "icon": "users"},
     {"key": "pipeline", "label": "Pipeline",      "path": f"{APP_PREFIX}/pipeline",   "icon": "trending-up"},
-    {"key": "projekte", "label": "Projekte",      "path": f"{APP_PREFIX}/projects",   "icon": "folder"},
+    {"key": "projekte",         "label": "Projekte",      "path": f"{APP_PREFIX}/projects",           "icon": "folder"},
 ]
 
 # ─── Breadcrumb-Map ────────────────────────────────────────────────────────────
@@ -70,8 +70,8 @@ _BREADCRUMB_MAP = {
                  {"label": "Deal Pipeline", "path": f"{APP_PREFIX}/pipeline"}],
     "projekte": [{"label": "Home", "path": f"{APP_PREFIX}/"},
                  {"label": "Projekte", "path": f"{APP_PREFIX}/projects"}],
-    "settings": [{"label": "Home", "path": f"{APP_PREFIX}/"},
-                 {"label": "Einstellungen", "path": f"{APP_PREFIX}/settings"}],
+    "settings":         [{"label": "Home", "path": f"{APP_PREFIX}/"},
+                         {"label": "Einstellungen", "path": f"{APP_PREFIX}/settings"}],
 }
 
 
@@ -190,7 +190,7 @@ def _resolve_active(path: str) -> str:
     # K-BUG-001: Extra-Prefixes fuer Routes die nicht unter dem NAV_ITEMS-Pfad liegen
     EXTRA_PREFIXES = {
         "pipeline": ["/deals"],
-        "crm":      ["/unternehmen", "/touchpoints"],
+        "crm":           ["/unternehmen", "/touchpoints"],
     }
     best = "home"
     best_len = 0

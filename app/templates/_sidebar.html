@@ -18,6 +18,9 @@
               display: flex; flex-direction: column;">
 
   <nav style="padding: 16px 0 12px; flex: 1;">
+  {%- set is_ext = (request.session.get('user', {}).get('external_role') == 'external_partner') %}
+
+  {% if not is_ext %}{# CBH-intern: volle Sidebar – Workspace, Tools, etc. #}
 
     <!-- SECTION: WORKSPACE -->
     <div class="section-label" style="margin-top: 0; margin-bottom: 6px;">
@@ -171,6 +174,9 @@
     </div>
 
   </nav>
+
+  
+  {% endif %}{# /not is_ext #}
 
   <!-- Sticky Footer: Team-Account-Block v2 (UX-Refactor: horizontal avatars, no click) -->
   <div style="padding-bottom: 8px; flex-shrink: 0;" id="account-footer">

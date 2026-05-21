@@ -66,7 +66,7 @@ class AuthGuardMiddleware(BaseHTTPMiddleware):
     AuthGuardMiddleware hat request.session verfuegbar.
     """
 
-    PUBLIC_PATHS = ("/health", "/auth/login", "/auth/callback", "/auth/logout", "/static")
+    PUBLIC_PATHS = ("/health", "/auth/login", "/auth/callback", "/auth/logout", "/auth/magic", "/static")
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
