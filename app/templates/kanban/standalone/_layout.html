@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+{# kanban/standalone/_layout.html – Minimales Standalone-Layout für MVG Kanban #}
+{# Pivot 3.0 | 2026-05-21 | Finn #}
+{# Kein extends base.html – eigene Shell, keine Sidebar, kein MissionCTRL-Topbar #}
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}MVG Lektorat – Bewerbungen{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;900&family=Barlow+Condensed:wght@700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+  /* ── CSS Reset ──────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── CSS Tokens (aus app.css übernommen) ────────────────────────────────── */
+  :root {
+    --bg-nav:         #111111;
+    --bg-base:        #1E1E1E;
+    --bg-card:        #252525;
+    --bg-header:      #161616;
+    --bg-input:       #2A2A2A;
+    --text-primary:   #E5E7EB;
+    --text-secondary: #9CA3AF;
+    --text-muted:     #6B7280;
+    --accent-yellow:  #FFFB76;
+    --accent-blue:    #5870E2;
+    --border:         #374151;
+    --border-sub:     #1F2937;
+    --status-success: #22C55E;
+    --status-error:   #EF4444;
+    --status-warning: #F59E0B;
+  }
+
+  body {
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: 'Barlow', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── Standalone Header (Sarah Spec §4) ──────────────────────────────────── */
+  .standalone-header {
+    height: 52px;
+    background: var(--bg-nav);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border-sub);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .standalone-header__brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .standalone-header__logo {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    /* Inline-SVG als Fallback wenn rockfist-logo.svg fehlt */
+  }
+
+  .standalone-header__title {
+    font-family: 'Barlow', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .standalone-header__user {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  /* ── User-Indicator (Sarah Spec §5) ─────────────────────────────────────── */
+  .user-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-secondary);
+  }
+
+  .user-indicator__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--status-success);
+    flex-shrink: 0;
+  }
+
+  /* ── Logout-Button (Sarah Spec §6) ──────────────────────────────────────── */
+  .logout-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: background 0.12s, color 0.12s;
+  }
+
+  .logout-link:hover {
+    background: rgba(255,255,255,0.06);
+    color: var(--text-primary);
+  }
+
+  /* ── Tablet: E-Mail bei < 768px ausblenden (Sarah Spec §9) ──────────────── */
+  @media (max-width: 767px) {
+    .user-indicator__email {
+      display: none;
+    }
+  }
+  </style>
+
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+  <!-- Standalone Header -->
+  <header class="standalone-header">
+    <div class="standalone-header__brand">
+      <img src="/static/img/rockfist-logo.svg"
+           alt=""
+           class="standalone-header__logo"
+           onerror="this.style.display='none'">
+      <span class="standalone-header__title">MVG KI-LEKTORAT – Bewerbungen</span>
+    </div>
+    <div class="standalone-header__user">
+      <span class="user-indicator">
+        <span class="user-indicator__dot"></span>
+        <span class="user-indicator__email">{{ current_user_email | default('') }}</span>
+      </span>
+      <a href="/auth/logout" class="logout-link" title="Abmelden">
+        <!-- Tür-Icon SVG 16x16 (Sarah Spec §4) -->
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+             stroke="currentColor" stroke-width="1.5">
+          <path d="M10 3h3a1 1 0 011 1v8a1 1 0 01-1 1h-3M7 5l-3 3 3 3M4 8h7"/>
+        </svg>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block scripts %}{% endblock %}
+
+</body>
+</html>

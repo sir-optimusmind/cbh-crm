@@ -1,0 +1,559 @@
+{% extends "kanban/standalone/_layout.html" %}
+{# kanban/standalone/lektorat_mvg.html – MVG Bewerber-Kanban Board (Standalone) #}
+{# Pivot 3.0 | 2026-05-21 | Finn #}
+{# Rausgelöst aus base.html. Keine Sidebar, kein MissionCTRL-Topbar. #}
+{# Route: GET /kanban/mvg-lektorat/ #}
+
+{% block title %}MVG Lektorat – Bewerbungen{% endblock %}
+
+{% block head %}
+<style>
+/* ── Page Sub-Header (Sarah Spec §7) ───────────────────────────────────── */
+.page-subheader {
+  height: 48px;
+  background: var(--bg-base);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border-sub);
+}
+
+.page-subheader__title {
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin: 0;
+}
+
+.page-subheader__meta {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.page-subheader__count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.page-subheader__sep {
+  color: var(--text-muted);
+  margin: 0 8px;
+}
+
+/* ── Kanban Board (Sarah Spec §12: kein Sidebar-Offset, volle Breite) ──── */
+.kanban-board {
+  display: flex;
+  gap: 12px;
+  padding: 24px;
+  overflow-x: auto;
+  background: var(--bg-base);
+  min-height: calc(100vh - 100px); /* 52px Header + 48px Sub-Header */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-sub) transparent;
+}
+
+.kanban-col {
+  min-width: 240px;
+  max-width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.kanban-col__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-header);
+  border-radius: 6px 6px 0 0;
+  border-left: 3px solid var(--col-accent, var(--text-muted));
+}
+
+.kanban-col__label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+}
+
+.kanban-col__count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--col-accent, var(--text-muted));
+  background: rgba(255,255,255,0.05);
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+.kanban-col__body {
+  flex: 1;
+  padding: 8px;
+  background: rgba(255,255,255,0.015);
+  border-radius: 0 0 6px 6px;
+  min-height: 120px;
+  transition: background 0.12s, border 0.12s;
+}
+
+.kanban-col__body.drag-over {
+  background: rgba(255,251,118,0.04);
+  border: 2px dashed var(--accent-yellow);
+  border-radius: 6px;
+}
+
+/* ── Karten ─────────────────────────────────────────────────────────────── */
+.kanban-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-sub);
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: grab;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  margin-bottom: 8px;
+}
+.kanban-card:hover {
+  border-color: var(--border);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  transform: translateY(-1px);
+}
+.kanban-card.dragging {
+  cursor: grabbing;
+  opacity: 0.55;
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+.kanban-card__name {
+  font-family: 'Barlow', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.kanban-card__divider {
+  border: none;
+  border-top: 1px solid var(--border-sub);
+  margin: 0 0 6px;
+}
+.kanban-card__meta {
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.kanban-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.kanban-card__comment-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.kanban-card__drive-link {
+  color: var(--text-muted);
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 0.1s;
+}
+.kanban-card__drive-link:hover { color: var(--text-secondary); }
+
+/* ── Badges ─────────────────────────────────────────────────────────────── */
+.badge-remote {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(88,112,226,0.15);
+  border: 1px solid var(--accent-blue);
+  color: var(--accent-blue);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.badge-vor-ort {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--accent-yellow);
+  border: 1px solid var(--accent-yellow);
+  color: #111111;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Detail Panel (Sarah Spec §11: top=100px, height=calc(100vh - 100px)) ── */
+#kanban-panel {
+  position: fixed;
+  right: 0;
+  top: 100px;
+  width: 420px;
+  height: calc(100vh - 100px);
+  background: var(--bg-card);
+  border-left: 1px solid var(--border-sub);
+  z-index: 500;
+  overflow-y: auto;
+  padding: 24px;
+  transform: translateX(420px);
+  transition: transform 0.22s ease;
+}
+#kanban-panel.open {
+  transform: translateX(0);
+}
+#kanban-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.25);
+  z-index: 499;
+  pointer-events: none;
+}
+#kanban-overlay.visible { display: block; }
+
+/* ── Comment Thread ──────────────────────────────────────────────────────── */
+.comment-item { margin-bottom: 14px; }
+.comment-meta { margin-bottom: 3px; }
+.comment-author {
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.comment-ts {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+.comment-text {
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+.section-label-sm {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  margin-top: 16px;
+}
+
+/* ── K-BUG-003: Mobile – Karten read-only (HTML5 DnD nicht Touch-fähig) ──── */
+.mobile-dnd-hint {
+  display: none;
+}
+@media (max-width: 768px) {
+  .kanban-card {
+    cursor: default;
+  }
+  .kanban-card.dragging {
+    opacity: 1;
+    transform: none;
+  }
+  .mobile-dnd-hint {
+    display: block;
+    background: rgba(255,251,118,0.06);
+    border: 1px solid rgba(255,251,118,0.15);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    margin: 8px 24px 0;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── Page Sub-Header (Sarah Spec §7) ─────────────────────────────────────── #}
+<div class="page-subheader">
+  <h1 class="page-subheader__title">MVG KI-LEKTORAT</h1>
+  <div class="page-subheader__meta">
+    <span class="page-subheader__count" id="bewerber-count">{{ total }} Bewerber</span>
+    {% if not is_external %}
+    <span class="page-subheader__sep">·</span>
+    <a href="/kanban/mvg-lektorat/setup"
+       style="font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700;
+              text-transform:uppercase; letter-spacing:0.08em;
+              color:var(--text-muted); text-decoration:none; display:flex; align-items:center; gap:5px;
+              padding:4px 10px; border:1px solid var(--border-sub); border-radius:4px;"
+       onmouseover="this.style.borderColor='var(--accent-yellow)';this.style.color='var(--accent-yellow)'"
+       onmouseout="this.style.borderColor='var(--border-sub)';this.style.color='var(--text-muted)'">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      Setup
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Mobile Read-Only Hinweis (K-BUG-003) ─────────────────────────────────── #}
+<div class="mobile-dnd-hint">Drag &amp; Drop ist auf Mobilgeräten nicht verfügbar. Nutze den Status-Dropdown im Bewerber-Panel.</div>
+
+{# ── Board ─────────────────────────────────────────────────────────────────── #}
+{%
+  set col_accents = {
+    'eingang':        'var(--text-muted)',
+    'sichtung':       'var(--accent-yellow)',
+    'erstgespraech':  'var(--accent-blue)',
+    'zweitgespraech': 'var(--status-warning)',
+    'absage':         'var(--status-error)'
+  }
+%}
+<div class="kanban-board" id="kanban-board">
+  {% for col in columns %}
+  {% set apps = grouped.get(col.col_key, []) %}
+  {% set accent = col_accents.get(col.col_key, 'var(--text-muted)') %}
+  <div class="kanban-col" data-stage="{{ col.col_key }}" id="col-{{ col.col_key }}">
+    <div class="kanban-col__header" style="--col-accent: {{ accent }};">
+      <span class="kanban-col__label">{{ col.label }}</span>
+      <span class="kanban-col__count" id="count-{{ col.col_key }}">{{ apps|length }}</span>
+    </div>
+    <div class="kanban-col__body"
+         id="body-{{ col.col_key }}"
+         ondragover="onDragOver(event, '{{ col.col_key }}')"
+         ondragleave="onDragLeave(event)"
+         ondrop="onDrop(event, '{{ col.col_key }}')">
+      {% for app in apps %}
+      <div class="kanban-card"
+           draggable="true"
+           data-id="{{ app.id }}"
+           data-stage="{{ app.status }}"
+           id="card-{{ app.id }}"
+           ondragstart="onDragStart(event)"
+           ondragend="onDragEnd(event)"
+           onclick="openDetailPanel({{ app.id }})">
+        <div class="kanban-card__name">{{ app.nachname }}, {{ app.vorname }}</div>
+        <hr class="kanban-card__divider">
+        <div class="kanban-card__meta">
+          {{ app.eingangsdatum[:10] if app.eingangsdatum else '–' }}
+          {% if app.quelle %} · {{ app.quelle }}{% endif %}
+        </div>
+        <div class="kanban-card__footer">
+          <div style="display:flex; align-items:center; gap:6px;">
+            {% if app.remote_tag %}
+            <span class="badge-remote">REMOTE</span>
+            {% else %}
+            <span class="badge-vor-ort">VOR ORT</span>
+            {% endif %}
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            {% if app.drive_subfolder_url %}
+            <a href="{{ app.drive_subfolder_url }}" target="_blank" rel="noopener"
+               class="kanban-card__drive-link" onclick="event.stopPropagation()" title="Unterlagen öffnen">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M1.5 3A1.5 1.5 0 0 0 0 4.5v8A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H7.621a1.5 1.5 0 0 1-1.06-.44L5.5 3H1.5Z"/>
+              </svg>
+            </a>
+            {% endif %}
+            {% if app.comment_count > 0 %}
+            <span class="kanban-card__comment-count">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"
+                   stroke="currentColor" stroke-width="1.5">
+                <path d="M14 2H2a1 1 0 00-1 1v8a1 1 0 001 1h3l2 2 2-2h5a1 1 0 001-1V3a1 1 0 00-1-1z"/>
+              </svg>
+              {{ app.comment_count }}
+            </span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{# ── Detail Panel ──────────────────────────────────────────────────────────── #}
+<div id="kanban-overlay"></div>
+<div id="kanban-panel">
+  <div id="kanban-panel-content">
+    <!-- wird via Fetch befüllt -->
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Prefix für API-Calls: neue Route unter /kanban/mvg-lektorat/
+var PREFIX = '/kanban/mvg-lektorat';
+// Für Detail-Panel-Partial (window._prefix wird vom Partial genutzt)
+window._prefix = PREFIX;
+
+var _dragCard = null;
+var _dragFromCol = null;
+
+// ── K-BUG-003: Mobile Guard – DnD nur auf Desktop aktiv ──────────────────────
+var _isMobile = window.matchMedia('(max-width: 768px)').matches;
+
+// ── Drag-and-Drop ────────────────────────────────────────────────────────────
+function onDragStart(e) {
+  if (_isMobile) { e.preventDefault(); return; }
+  _dragCard = e.currentTarget;
+  _dragFromCol = _dragCard.dataset.stage;
+  setTimeout(function() { _dragCard.classList.add('dragging'); }, 10);
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', _dragCard.dataset.id);
+}
+
+function onDragEnd(e) {
+  if (_dragCard) _dragCard.classList.remove('dragging');
+  document.querySelectorAll('.kanban-col__body').forEach(function(b) {
+    b.classList.remove('drag-over');
+  });
+}
+
+function onDragOver(e, colKey) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.getElementById('body-' + colKey).classList.add('drag-over');
+}
+
+function onDragLeave(e) {
+  var body = e.currentTarget;
+  if (body.classList) body.classList.remove('drag-over');
+}
+
+function onDrop(e, newStage) {
+  e.preventDefault();
+  var body = document.getElementById('body-' + newStage);
+  if (body) body.classList.remove('drag-over');
+
+  var cardId = e.dataTransfer.getData('text/plain');
+  if (!cardId || !_dragCard) return;
+  var oldStage = _dragCard.dataset.stage;
+  if (oldStage === newStage) return;
+
+  // Karte visuell verschieben
+  var targetBody = document.getElementById('body-' + newStage);
+  targetBody.insertBefore(_dragCard, targetBody.firstChild);
+  _dragCard.dataset.stage = newStage;
+  updateColumnCounts();
+
+  // PATCH an Backend (neue URL)
+  fetch(PREFIX + '/api/applicants/' + cardId + '/status', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ new_status: newStage })
+  }).then(function(r) {
+    if (!r.ok) {
+      // Rollback
+      var oldBody = document.getElementById('body-' + oldStage);
+      oldBody.insertBefore(_dragCard, oldBody.firstChild);
+      _dragCard.dataset.stage = oldStage;
+      updateColumnCounts();
+      showToast('Fehler beim Speichern – bitte erneut versuchen.', 'error');
+    }
+  }).catch(function() {
+    showToast('Netzwerkfehler – bitte erneut versuchen.', 'error');
+  });
+
+  _dragCard = null;
+}
+
+function updateColumnCounts() {
+  document.querySelectorAll('.kanban-col').forEach(function(col) {
+    var stage = col.dataset.stage;
+    var count = col.querySelectorAll('.kanban-card').length;
+    var counter = document.getElementById('count-' + stage);
+    if (counter) counter.textContent = count;
+  });
+}
+
+// ── Detail Panel ─────────────────────────────────────────────────────────────
+function openDetailPanel(applicantId) {
+  var panel = document.getElementById('kanban-panel');
+  var overlay = document.getElementById('kanban-overlay');
+  var content = document.getElementById('kanban-panel-content');
+
+  content.innerHTML = '<div style="padding:24px; color:var(--text-muted); font-family:Barlow,sans-serif;">Laden…</div>';
+  panel.classList.add('open');
+  overlay.classList.add('visible');
+
+  fetch(PREFIX + '/api/applicants/' + applicantId + '/detail', {
+    credentials: 'same-origin'
+  }).then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.text();
+  }).then(function(html) {
+    content.innerHTML = html;
+  }).catch(function(err) {
+    content.innerHTML = '<div style="padding:24px; color:var(--status-error); font-family:Barlow,sans-serif;">Fehler beim Laden.</div>';
+  });
+}
+
+function closeDetailPanel() {
+  document.getElementById('kanban-panel').classList.remove('open');
+  document.getElementById('kanban-overlay').classList.remove('visible');
+}
+
+// ESC schließt Panel
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeDetailPanel();
+});
+
+// ── Polling (alle 30s) ────────────────────────────────────────────────────────
+var _lastPollHash = null;
+
+function pollBoard() {
+  fetch(PREFIX + '/api/applicants', {
+    credentials: 'same-origin'
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var hash = JSON.stringify(data);
+    if (_lastPollHash && _lastPollHash !== hash) {
+      var panelOpen = document.getElementById('kanban-panel').classList.contains('open');
+      if (!panelOpen) {
+        window.location.reload();
+      }
+    }
+    _lastPollHash = hash;
+  }).catch(function() {});
+}
+
+setInterval(pollBoard, 30000);
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg, type) {
+  var t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;' +
+    'background:' + (type === 'error' ? '#1a0a0a' : '#0a1a0a') + ';' +
+    'border:1px solid ' + (type === 'error' ? 'var(--status-error)' : 'var(--status-success)') + ';' +
+    'color:' + (type === 'error' ? 'var(--status-error)' : 'var(--status-success)') + ';' +
+    'padding:10px 16px;border-radius:6px;font-family:Barlow,sans-serif;font-size:13px;' +
+    'font-weight:600;max-width:340px;';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function() { t.remove(); }, 4000);
+}
+</script>
+{% endblock %}

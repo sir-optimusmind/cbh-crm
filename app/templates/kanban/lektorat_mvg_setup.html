@@ -1,0 +1,455 @@
+{# templates/kanban/lektorat_mvg_setup.html – Setup-Page (nur internal) #}
+{# Google Drive Picker + Magic-Link Management #}
+{% extends "base.html" %}
+
+{% block title %}MVG Kanban Setup | CBH MISSION CTRL{% endblock %}
+
+{% block head %}
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;900&family=Barlow+Condensed:wght@700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<!-- Google Picker API -->
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiReady=true"></script>
+<script>
+var GOOGLE_PICKER_API_KEY = "{{ google_picker_api_key }}";
+var GOOGLE_PROJECT_NUMBER = "{{ google_project_number }}";
+var gapiReady = false;
+</script>
+<style>
+.picker-dialog, .picker-dialog-bg { z-index: 10001 !important; }
+.setup-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.setup-section-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+.setup-h3 {
+  font-family: 'Barlow', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.form-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.form-field { flex: 1; min-width: 160px; }
+.btn-primary {
+  background: var(--accent-yellow);
+  color: #111111;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 6px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.1s;
+}
+.btn-primary:hover { opacity: 0.85; }
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.1s, color 0.1s;
+}
+.btn-ghost:hover { border-color: var(--accent-yellow); color: var(--accent-yellow); }
+.btn-danger {
+  background: transparent;
+  border: 1px solid var(--status-error);
+  color: var(--status-error);
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.btn-danger:hover { background: rgba(239,68,68,0.1); }
+.link-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+.link-table th {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.link-table td {
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--border-sub);
+  vertical-align: middle;
+}
+.link-table tr:hover td { background: rgba(255,255,255,0.02); }
+.mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.link-url-cell {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--accent-yellow);
+}
+.status-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.status-active { background: rgba(34,197,94,0.15); border: 1px solid #22C55E; color: #22C55E; }
+.status-used   { background: rgba(245,158,11,0.15); border: 1px solid #F59E0B; color: #F59E0B; }
+.status-revoked{ background: rgba(239,68,68,0.15); border: 1px solid var(--status-error); color: var(--status-error); }
+#picker-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--accent-yellow);
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.1s;
+}
+#picker-btn:hover { border-color: var(--accent-yellow); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding: 32px; max-width: 860px;">
+
+  <!-- Header -->
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:24px;">
+    <a href="{{ prefix }}/kanban/lektorat-mvg/"
+       style="color:var(--text-muted); text-decoration:none; display:flex; align-items:center;"
+       onmouseover="this.style.color='var(--text-primary)'"
+       onmouseout="this.style.color='var(--text-muted)'">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </a>
+    <h1 style="font-family:'Barlow',sans-serif; font-size:22px; font-weight:900;
+               color:var(--text-primary); margin:0; letter-spacing:0.02em;">
+      MVG LEKTORAT – SETUP
+    </h1>
+  </div>
+
+  <!-- Section: Google Drive Master-Ordner -->
+  <div class="setup-section">
+    <div class="setup-section-title">Google Drive</div>
+    <div class="setup-h3">Master-Ordner für Bewerber-Unterlagen</div>
+    <p style="font-family:'Barlow',sans-serif; font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
+      Alle Bewerber-Unterlagen werden als Unterordner hier abgelegt.
+    </p>
+
+    {% if config.master_folder_id %}
+    <div id="folder-selection" style="background:var(--bg-input); border:1px solid var(--border); border-radius:6px; padding:10px 14px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--accent-yellow)">
+          <path d="M1.5 3A1.5 1.5 0 0 0 0 4.5v8A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H7.621a1.5 1.5 0 0 1-1.06-.44L5.5 3H1.5Z"/>
+        </svg>
+        <span style="font-family:'Barlow',sans-serif; font-size:13px; font-weight:700; color:var(--text-primary);">
+          {{ config.master_folder_name or config.master_folder_id }}
+        </span>
+      </div>
+      {% if config.master_folder_url %}
+      <a href="{{ config.master_folder_url }}" target="_blank" rel="noopener"
+         style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-muted); text-decoration:none;"
+         onmouseover="this.style.textDecoration='underline'"
+         onmouseout="this.style.textDecoration='none'">Öffnen</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <button id="picker-btn" onclick="openSetupPicker()">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M1.5 3A1.5 1.5 0 0 0 0 4.5v8A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H7.621a1.5 1.5 0 0 1-1.06-.44L5.5 3H1.5Z"/>
+      </svg>
+      {{ 'Ordner ändern' if config.master_folder_id else 'Ordner auswählen' }}
+    </button>
+    <div id="picker-status" style="font-family:'Barlow',sans-serif; font-size:12px; color:var(--text-muted); min-height:18px; margin-top:8px;"></div>
+  </div>
+
+  <!-- Section: Magic Links -->
+  <div class="setup-section">
+    <div class="setup-section-title">Partner-Zugang</div>
+    <div class="setup-h3">Magic Links für externe Partner</div>
+    <p style="font-family:'Barlow',sans-serif; font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
+      Generiere Einmallinks für Stefan und Matthias (MVG). Links sind 7 Tage gültig, danach sliding Session 14 Tage.
+    </p>
+
+    <!-- Link generieren -->
+    <div class="form-row" style="margin-bottom:16px;">
+      <div class="form-field">
+        <label style="display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px;">
+          E-Mail-Adresse
+        </label>
+        <input type="email" id="link-email" placeholder="stefan@mvg.de"
+               style="background:var(--bg-input); border:1px solid var(--border);
+                      color:var(--text-primary); padding:9px 12px; border-radius:6px;
+                      width:100%; box-sizing:border-box; font-family:'Barlow',sans-serif; font-size:13px;">
+      </div>
+      <div style="flex:0 0 auto;">
+        <label style="display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px;">
+          Gültig (Tage)
+        </label>
+        <input type="number" id="link-days" value="7" min="1" max="90"
+               style="background:var(--bg-input); border:1px solid var(--border);
+                      color:var(--text-primary); padding:9px 12px; border-radius:6px;
+                      width:80px; font-family:'Barlow',sans-serif; font-size:13px;">
+      </div>
+      <button class="btn-primary" onclick="generateLink()">Link erstellen</button>
+    </div>
+
+    <!-- Generierter Link -->
+    <div id="generated-link-box"
+         style="display:none; background:rgba(255,251,118,0.06); border:1px solid rgba(255,251,118,0.2);
+                border-radius:6px; padding:12px 14px; margin-bottom:16px;">
+      <div style="font-family:'Barlow Condensed',sans-serif; font-size:10px; font-weight:700;
+                  text-transform:uppercase; letter-spacing:0.1em; color:var(--accent-yellow); margin-bottom:6px;">
+        LINK GENERIERT – JETZT KOPIEREN
+      </div>
+      <div id="generated-link-text"
+           style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-primary);
+                  word-break:break-all; margin-bottom:8px;"></div>
+      <button class="btn-ghost" onclick="copyGeneratedLink()" style="font-size:12px; padding:5px 10px;">
+        Link kopieren
+      </button>
+    </div>
+
+    <!-- Bestehende Links -->
+    {% if magic_links %}
+    <table class="link-table">
+      <thead>
+        <tr>
+          <th>E-Mail</th>
+          <th>Erstellt</th>
+          <th>Läuft ab</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="links-tbody">
+        {% for link in magic_links %}
+        <tr id="link-row-{{ link.token_hash[:12] }}">
+          <td>{{ link.email }}</td>
+          <td class="mono">{{ link.created_at[:10] }}</td>
+          <td class="mono">{{ link.expires_at[:10] }}</td>
+          <td>
+            {% set now_str = now_hour %}
+            {% if link.used_at %}
+            <span class="status-badge status-used">Benutzt</span>
+            {% else %}
+            <span class="status-badge status-active">Aktiv</span>
+            {% endif %}
+          </td>
+          <td>
+            <button class="btn-danger"
+                    onclick="revokeLink('{{ link.token_hash }}', this)">
+              Revoken
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="font-family:'Barlow',sans-serif; font-size:13px; color:var(--text-muted);">
+      Noch keine Links erstellt.
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var PREFIX = "{{ prefix }}";
+var _pickerApiLoaded = false;
+var _pickerAccessToken = null;
+var _generatedLink = '';
+
+// ── Google Picker ─────────────────────────────────────────────────────────────
+function loadPickerApi(callback) {
+  if (_pickerApiLoaded) { callback(); return; }
+  if (typeof gapi === 'undefined') {
+    setTimeout(function() { loadPickerApi(callback); }, 200);
+    return;
+  }
+  gapi.load('picker', function() { _pickerApiLoaded = true; callback(); });
+}
+
+function fetchPickerToken(callback) {
+  fetch(PREFIX + '/drive/picker-token', { credentials: 'same-origin' })
+    .then(function(r) { return r.json().then(function(d) { return {status: r.status, data: d}; }); })
+    .then(function(res) {
+      if (res.status !== 200 || !res.data.access_token) {
+        document.getElementById('picker-status').textContent = 'Drive-Auth fehlt. Bitte auf /pipeline Drive neu verbinden.';
+        return;
+      }
+      _pickerAccessToken = res.data.access_token;
+      callback(_pickerAccessToken);
+    })
+    .catch(function() {
+      document.getElementById('picker-status').textContent = 'Netzwerkfehler beim Token-Abruf.';
+    });
+}
+
+function openSetupPicker() {
+  var btn = document.getElementById('picker-btn');
+  btn.textContent = 'Laden…';
+  btn.disabled = true;
+
+  fetchPickerToken(function(token) {
+    loadPickerApi(function() {
+      btn.textContent = 'Ordner wählen';
+      btn.disabled = false;
+
+      var picker = new google.picker.PickerBuilder()
+        .addView(
+          new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+            .setSelectFolderEnabled(true)
+            .setMimeTypes('application/vnd.google-apps.folder')
+            .setIncludeFolders(true)
+        )
+        .addView(
+          new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+            .setSelectFolderEnabled(true)
+            .setEnableDrives(true)
+        )
+        .setOAuthToken(token)
+        .setDeveloperKey(GOOGLE_PICKER_API_KEY)
+        .setAppId(GOOGLE_PROJECT_NUMBER)
+        .setCallback(setupPickerCallback)
+        .setTitle('Bewerber Master-Ordner wählen')
+        .build();
+      picker.setVisible(true);
+    });
+  });
+}
+
+function setupPickerCallback(data) {
+  if (data.action === google.picker.Action.PICKED) {
+    var doc = data.docs[0];
+    var statusEl = document.getElementById('picker-status');
+    statusEl.textContent = 'Speichern…';
+
+    fetch(PREFIX + '/kanban/lektorat-mvg/setup/master-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        folder_id:   doc.id,
+        folder_name: doc.name,
+        folder_url:  doc.url
+      })
+    }).then(function(r) {
+      if (r.ok) {
+        statusEl.style.color = 'var(--status-success)';
+        statusEl.textContent = 'Gespeichert: ' + doc.name;
+        setTimeout(function() { window.location.reload(); }, 1500);
+      } else {
+        statusEl.style.color = 'var(--status-error)';
+        statusEl.textContent = 'Fehler beim Speichern.';
+      }
+    }).catch(function() {
+      statusEl.style.color = 'var(--status-error)';
+      statusEl.textContent = 'Netzwerkfehler.';
+    });
+  }
+}
+
+// ── Magic Links ───────────────────────────────────────────────────────────────
+function generateLink() {
+  var email = document.getElementById('link-email').value.trim();
+  var days  = parseInt(document.getElementById('link-days').value) || 7;
+  if (!email) { alert('E-Mail-Adresse fehlt.'); return; }
+
+  fetch(PREFIX + '/kanban/lektorat-mvg/setup/links', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ email: email, expires_in_days: days })
+  }).then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        _generatedLink = data.url;
+        document.getElementById('generated-link-text').textContent = data.url;
+        document.getElementById('generated-link-box').style.display = 'block';
+        setTimeout(function() { window.location.reload(); }, 5000);
+      } else {
+        alert('Fehler: ' + (data.error || 'Unbekannt'));
+      }
+    })
+    .catch(function() { alert('Netzwerkfehler.'); });
+}
+
+function copyGeneratedLink() {
+  if (!_generatedLink) return;
+  navigator.clipboard.writeText(_generatedLink).then(function() {
+    var btn = event.target;
+    btn.textContent = 'Kopiert!';
+    setTimeout(function() { btn.textContent = 'Link kopieren'; }, 2000);
+  }).catch(function() {
+    prompt('Link kopieren:', _generatedLink);
+  });
+}
+
+function revokeLink(tokenHash, btn) {
+  if (!confirm('Link wirklich revoken? Die laufende Session wird ebenfalls ungültig.')) return;
+
+  fetch(PREFIX + '/kanban/lektorat-mvg/setup/links/' + tokenHash + '/revoke', {
+    method: 'POST',
+    credentials: 'same-origin'
+  }).then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        var row = btn.closest('tr');
+        if (row) {
+          var statusCell = row.querySelector('td:nth-child(4)');
+          if (statusCell) {
+            statusCell.innerHTML = '<span class="status-badge status-revoked">Revoked</span>';
+          }
+          btn.disabled = true;
+          btn.style.opacity = '0.4';
+        }
+      }
+    })
+    .catch(function() { alert('Netzwerkfehler.'); });
+}
+</script>
+{% endblock %}

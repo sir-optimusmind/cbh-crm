@@ -63,7 +63,8 @@ def generate_magic_link(
         conn.close()
 
     base = os.getenv("APP_BASE_URL", "https://hook.srv960331.hstgr.cloud")
-    return f"{base}{APP_PREFIX}/auth/magic/{raw_token}"
+    # Magic-Link-Route liegt auf App-Root (/auth/magic/<token>), nicht unter APP_PREFIX
+    return f"{base}/auth/magic/{raw_token}"
 
 
 def revoke_magic_link(token_hash: str) -> bool:
@@ -106,15 +107,27 @@ def _lookup_or_create_partner(
         ).fetchone()
 
         if row:
+            # K-BUG-008 Fix: Leerer String ist explizit "keine Module" — NICHT durch Default ersetzen.
+            # Python-or würde "" als falsy behandeln und den Default einsetzen → Access-Control-Bypass.
+            # Strenge NULL-Diskriminierung: nur echtes NULL fällt auf allowed_modules-Argument zurück.
+            effective_modules = row["allowed_modules"] if row["allowed_modules"] is not None else allowed_modules
             return {
                 "email":          row["email"],
                 "name":           row["name"],
                 "user_id":        row["user_id"],
                 "role":           row["role"],
                 "external_role":  row["external_role"],
-                "allowed_modules": row["allowed_modules"] or allowed_modules,
+                "allowed_modules": effective_modules,
                 "color":          row["color_hex"] or "#6B7280",
             }
+
+        # Domain-Guard: Nur @cbh.ai darf JIT-provisioniert werden.
+        # Bestehende externe Partner-Accounts (explizit angelegt, active=1) bleiben funktionsfähig –
+        # dieser Guard greift nur beim automatischen Anlegen neuer Rows.
+        ALLOWED_EMAIL_DOMAIN = "@cbh.ai"
+        if not email.lower().endswith(ALLOWED_EMAIL_DOMAIN):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="Account not provisioned for this app")
 
         # Partner noch nicht in DB → Row anlegen
         name_part = email.split("@")[0].replace(".", " ").title()
@@ -303,7 +316,7 @@ async def magic_link_login(request: Request, raw_token: str):
             existing_user = request.session.get("user")
             if existing_user and existing_user.get("email") == row["email"]:
                 return RedirectResponse(
-                    url=f"{APP_PREFIX}/kanban/lektorat-mvg/", status_code=302
+                    url="/kanban/mvg-lektorat/", status_code=302
                 )
             logger.warning("magic_link: already-used token from %s", ip)
             return HTMLResponse(_EXPIRED_HTML, status_code=200)
@@ -343,8 +356,9 @@ async def magic_link_login(request: Request, raw_token: str):
         conn.commit()
 
         logger.info("magic_link login OK: %s", email)
+        # Pivot 3.0: Redirect auf neue Standalone-URL (außerhalb APP_PREFIX)
         return RedirectResponse(
-            url=f"{APP_PREFIX}/kanban/lektorat-mvg/", status_code=302
+            url="/kanban/mvg-lektorat/", status_code=302
         )
 
     finally:

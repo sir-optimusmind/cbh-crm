@@ -2,6 +2,7 @@
 main.py – CBH MISSION CTRL CRM Module
 FastAPI App – Sprint 1 + Sprint 2 + Sprint 3 (SSO + Modul-Trennung)
 Sprint 3 Wave 2: Sidebar + Breadcrumb + Command-Palette + Home-Dashboard
+Sprint 5 Pivot 3.0: Kanban als Standalone-Frontend
 
 APP_PREFIX kommt aus .env (PFLICHT, nie hardcoden).
 SSO via Google OAuth (CRM-031/032/033/034).
@@ -26,6 +27,8 @@ from app.modules.crm.routes import router as crm_router
 from app.modules.pipeline.routes import router as pipeline_router
 from app.modules.projects.routes import router as projects_router
 from app.shared.drive_auth import router as drive_auth_router
+from app.routes.kanban import router as kanban_router
+from app.shared.kanban_auth import router as kanban_auth_router
 
 # ─── Konfiguration aus .env ───────────────────────────────────────────────────
 APP_PREFIX = os.getenv("APP_PREFIX", "/mission-ctrl/crm-staging").rstrip("/")
@@ -64,9 +67,19 @@ class AuthGuardMiddleware(BaseHTTPMiddleware):
     SessionMiddleware wird NACH AuthGuardMiddleware registriert →
     SessionMiddleware laeuft ZUERST (verarbeitet Cookie) →
     AuthGuardMiddleware hat request.session verfuegbar.
+
+    Pivot 3.0:
+    /kanban/mvg-lektorat/* ist außerhalb APP_PREFIX.
+    Auth-Check läuft in den Route-Handlern selbst (require_kanban_access).
+    Middleware lässt diese Pfade durch ohne Session-Check.
+    External-Partner-Redirect: User mit external_role='external_partner'
+    die /mission-ctrl/-Routen aufrufen → direkt auf /kanban/mvg-lektorat/.
     """
 
     PUBLIC_PATHS = ("/health", "/auth/login", "/auth/callback", "/auth/logout", "/auth/magic", "/static")
+
+    # Standalone-Kanban: Auth läuft in den Route-Handlern (outside APP_PREFIX)
+    KANBAN_PREFIX = "/kanban/mvg-lektorat"
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -74,6 +87,10 @@ class AuthGuardMiddleware(BaseHTTPMiddleware):
         relative = path[len(root):] if path.startswith(root) else path
         if not relative:
             relative = "/"
+
+        # Standalone-Kanban-Pfad: direkt durchlassen (Auth in den Routes)
+        if path == self.KANBAN_PREFIX or path.startswith(self.KANBAN_PREFIX + "/"):
+            return await call_next(request)
 
         # Oeffentliche Pfade (inkl. Static)
         if any(relative == p or relative.startswith(p) for p in self.PUBLIC_PATHS):
@@ -84,6 +101,11 @@ class AuthGuardMiddleware(BaseHTTPMiddleware):
         if not user:
             request.session["next"] = path if path.startswith(root) else f"{root}{path}"
             return RedirectResponse(url=f"{root}/auth/login", status_code=302)
+
+        # Pivot 3.0: External-Partner-Redirect (Niko-Spec §7)
+        # external_partner hat keinen Zugang zu /mission-ctrl/... → Kanban
+        if user.get("external_role") == "external_partner" and path.startswith(root):
+            return RedirectResponse(url=self.KANBAN_PREFIX + "/", status_code=302)
 
         request.state.crm_user = user
         return await call_next(request)
@@ -107,6 +129,8 @@ app.include_router(crm_router)
 app.include_router(pipeline_router)
 app.include_router(projects_router)
 app.include_router(drive_auth_router)
+app.include_router(kanban_auth_router)
+app.include_router(kanban_router)
 
 
 # ─── Health-Check (oeffentlich) ───────────────────────────────────────────────
@@ -116,7 +140,7 @@ async def health():
         "status": "ok",
         "env": CRM_ENV,
         "auth": "sso",
-        "modules": ["crm", "pipeline", "projects"]
+        "modules": ["crm", "pipeline", "projects", "kanban:mvg-lektorat"]
     })
 
 

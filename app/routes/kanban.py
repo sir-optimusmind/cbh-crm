@@ -1,18 +1,23 @@
 """
 app/routes/kanban.py – MVG Bewerber-Kanban Routes
-Migration 014 | Sprint 5 | 2026-05-21
+Migration 014 | Sprint 5 | Pivot 3.0 | 2026-05-21
+
+Pivot 3.0: Frontend aus MissionCTRL-Shell rausgelöst.
+  - Neuer Prefix: /kanban/mvg-lektorat  (war: /kanban/lektorat-mvg)
+  - Templates: kanban/standalone/ (eigenes Layout, keine base.html)
+  - Backend (Auth, DB, API-Logik): unverändert
 
 Routes:
-  GET  /kanban/lektorat-mvg/                     Board-View
-  GET  /kanban/lektorat-mvg/setup                Setup (nur internal)
-  GET  /kanban/lektorat-mvg/api/applicants        JSON-Liste (Polling alle 30s)
-  POST /kanban/lektorat-mvg/api/applicants        Neue Karte (Bearer-Token = Marcus-Webhook)
-  PATCH /kanban/lektorat-mvg/api/applicants/{id}/status   Move-Card (HTMX)
-  POST  /kanban/lektorat-mvg/api/applicants/{id}/comments Kommentar (HTMX)
-  POST  /kanban/lektorat-mvg/setup/master-folder  Picker-Callback
-  POST  /kanban/lektorat-mvg/setup/links          Magic-Link generieren
-  POST  /kanban/lektorat-mvg/setup/links/{token_hash}/revoke  Token revoken
-  GET   /kanban/lektorat-mvg/api/applicants/{id}/detail     Detail-Panel Partial
+  GET  /kanban/mvg-lektorat/                     Board-View (Standalone)
+  GET  /kanban/mvg-lektorat/setup                Setup (nur internal, Standalone)
+  GET  /kanban/mvg-lektorat/api/applicants        JSON-Liste (Polling alle 30s)
+  POST /kanban/mvg-lektorat/api/applicants        Neue Karte (Bearer-Token = Marcus-Webhook)
+  PATCH /kanban/mvg-lektorat/api/applicants/{id}/status   Move-Card
+  POST  /kanban/mvg-lektorat/api/applicants/{id}/comments Kommentar
+  POST  /kanban/mvg-lektorat/setup/master-folder  Picker-Callback
+  POST  /kanban/mvg-lektorat/setup/links          Magic-Link generieren
+  POST  /kanban/mvg-lektorat/setup/links/{token_hash}/revoke  Token revoken
+  GET   /kanban/mvg-lektorat/api/applicants/{id}/detail     Detail-Panel Partial
 """
 
 import json
@@ -36,7 +41,9 @@ from app.shared.kanban_auth import (
     revoke_magic_link,
     _write_kanban_audit,
     is_external_partner,
+    has_module_access,
 )
+from app.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +70,7 @@ def _check_rate_limit(token: str) -> bool:
     return True
 
 
-router = APIRouter(prefix="/kanban/lektorat-mvg")
+router = APIRouter(prefix="/kanban/mvg-lektorat")
 
 
 # ─── Helper ───────────────────────────────────────────────────────────────────
@@ -132,9 +139,15 @@ def _get_magic_links(conn) -> list[dict]:
 
 @router.get("/", response_class=HTMLResponse)
 async def kanban_board(request: Request):
-    user = require_kanban_access(request)
-    if not user:
-        return RedirectResponse(url="/mission-ctrl/crm-staging/auth/login", status_code=302)
+    # K-BUG-009 Fix: 302 nur wenn keine Session vorhanden.
+    # Eingeloggter User ohne Modul-Zugriff → 403 Forbidden (nicht 302 zu Login).
+    # Niko-Spec: KT-14 (leer) + KT-15 (fremdes Modul) → beide 403.
+    session_user = get_current_user(request)
+    if not session_user:
+        return RedirectResponse(url="/auth/magic/expired", status_code=302)
+    if not has_module_access(request, "kanban:lektorat-mvg"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    user = session_user
 
     conn = get_connection()
     try:
@@ -145,16 +158,20 @@ async def kanban_board(request: Request):
     finally:
         conn.close()
 
-    return render(
-        request, "kanban/lektorat_mvg.html",
-        extra_breadcrumb_label="MVG Lektorat",
-        columns=columns,
-        grouped=grouped,
-        config=config,
-        total=total,
-        is_external=is_external_partner(request),
-        current_user_email=user.get("email", ""),
-    )
+    # Pivot 3.0: Standalone-Template (kein base.html, keine Sidebar)
+    from fastapi.templating import Jinja2Templates
+    import os
+    _tdir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
+    _tmpl = Jinja2Templates(directory=_tdir)
+    return _tmpl.TemplateResponse(request, "kanban/standalone/lektorat_mvg.html", {
+        "request":             request,
+        "columns":             columns,
+        "grouped":             grouped,
+        "config":              config,
+        "total":               total,
+        "is_external":         is_external_partner(request),
+        "current_user_email":  user.get("email", ""),
+    })
 
 
 # ─── Setup-Page (nur internal) ────────────────────────────────────────────────
@@ -172,14 +189,19 @@ async def kanban_setup(request: Request):
     finally:
         conn.close()
 
-    return render(
-        request, "kanban/lektorat_mvg_setup.html",
-        extra_breadcrumb_label="MVG Setup",
-        config=config,
-        magic_links=magic_links,
-        google_picker_api_key=GOOGLE_PICKER_API_KEY,
-        google_project_number=GOOGLE_PROJECT_NUMBER,
-    )
+    # Pivot 3.0: Standalone-Template
+    from fastapi.templating import Jinja2Templates
+    import os
+    _tdir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
+    _tmpl = Jinja2Templates(directory=_tdir)
+    return _tmpl.TemplateResponse(request, "kanban/standalone/lektorat_mvg_setup.html", {
+        "request":                request,
+        "config":                 config,
+        "magic_links":            magic_links,
+        "google_picker_api_key":  GOOGLE_PICKER_API_KEY,
+        "google_project_number":  GOOGLE_PROJECT_NUMBER,
+        "current_user_email":     user.get("email", ""),
+    })
 
 
 # ─── API: Applicant-Liste (JSON, HTMX-Polling) ───────────────────────────────
@@ -413,13 +435,18 @@ async def api_detail_panel(request: Request, applicant_id: int):
     finally:
         conn.close()
 
-    return render(
-        request, "kanban/lektorat_mvg_detail.html",
-        applicant=applicant,
-        comments=comments,
-        columns=columns,
-        current_user_name=user.get("name") or user.get("email", ""),
-    )
+    # Detail-Panel ist ein Fragment (kein Layout-extend) – direkt rendern
+    from fastapi.templating import Jinja2Templates
+    import os as _os
+    _tdir = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "templates")
+    _tmpl = Jinja2Templates(directory=_tdir)
+    return _tmpl.TemplateResponse(request, "kanban/lektorat_mvg_detail.html", {
+        "request":          request,
+        "applicant":        applicant,
+        "comments":         comments,
+        "columns":          columns,
+        "current_user_name": user.get("name") or user.get("email", ""),
+    })
 
 
 # ─── Setup: Picker-Callback ───────────────────────────────────────────────────

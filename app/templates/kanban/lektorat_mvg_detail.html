@@ -1,0 +1,304 @@
+{# templates/kanban/lektorat_mvg_detail.html – Detail-Panel Partial #}
+{# Gerendert von HTMX GET /api/applicants/{id}/detail #}
+{# Kein extends – ist ein Fragment, wird in #kanban-panel-content injiziert #}
+
+<style>
+.panel-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.1s;
+}
+.panel-close-btn:hover { color: var(--text-primary); }
+.detail-heading {
+  font-family: 'Barlow', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 12px 0 4px;
+}
+.ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.1s, color 0.1s;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 12px 0;
+}
+.ghost-btn:hover {
+  border-color: var(--accent-yellow);
+  color: var(--accent-yellow);
+}
+.ghost-btn:disabled, .ghost-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.status-select {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 9px 12px;
+  border-radius: 6px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+.status-select:focus { outline: none; border-color: var(--accent-yellow); }
+.comment-form-textarea {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  resize: vertical;
+  min-height: 72px;
+  box-sizing: border-box;
+}
+.comment-form-textarea:focus { outline: none; border-color: var(--accent-yellow); }
+.btn-primary {
+  background: var(--accent-yellow);
+  color: #111111;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+.btn-primary:hover { opacity: 0.85; }
+.panel-divider {
+  border: none;
+  border-top: 1px solid var(--border-sub);
+  margin: 16px 0;
+}
+</style>
+
+<!-- Panel Header -->
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+  <span style="font-family:'Barlow Condensed',sans-serif; font-size:10px; font-weight:700;
+               text-transform:uppercase; letter-spacing:0.12em; color:var(--text-muted);">
+    BEWERBER-DETAIL
+  </span>
+  <button class="panel-close-btn" onclick="closeDetailPanel()" title="Schließen">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  </button>
+</div>
+<hr class="panel-divider">
+
+<!-- Name + Meta -->
+<div class="detail-heading">{{ applicant.nachname }}, {{ applicant.vorname }}</div>
+<div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+  {% if applicant.remote_tag %}
+  <span class="badge-remote">REMOTE</span>
+  {% else %}
+  <span class="badge-vor-ort">VOR ORT</span>
+  {% endif %}
+  <span style="font-family:'Barlow',sans-serif; font-size:12px; color:var(--text-secondary);">
+    {{ applicant.eingangsdatum[:10] if applicant.eingangsdatum else '–' }}
+    {% if applicant.quelle %} · {{ applicant.quelle }}{% endif %}
+  </span>
+</div>
+
+<!-- Drive-Link -->
+{% if applicant.drive_subfolder_url %}
+<a href="{{ applicant.drive_subfolder_url }}" target="_blank" rel="noopener" class="ghost-btn">
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+    <path d="M1.5 3A1.5 1.5 0 0 0 0 4.5v8A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H7.621a1.5 1.5 0 0 1-1.06-.44L5.5 3H1.5Z"/>
+  </svg>
+  Unterlagen öffnen (Drive)
+</a>
+{% else %}
+<button class="ghost-btn" disabled title="Keine Unterlagen hinterlegt">
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+    <path d="M1.5 3A1.5 1.5 0 0 0 0 4.5v8A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H7.621a1.5 1.5 0 0 1-1.06-.44L5.5 3H1.5Z"/>
+  </svg>
+  Keine Unterlagen hinterlegt
+</button>
+{% endif %}
+
+<hr class="panel-divider">
+
+<!-- Status -->
+<div class="section-label-sm">STATUS</div>
+<select class="status-select" id="panel-status-select"
+        data-applicant-id="{{ applicant.id }}"
+        onchange="onStatusChange(this)">
+  {% for col in columns %}
+  <option value="{{ col.col_key }}"
+          {% if col.col_key == applicant.status %}selected{% endif %}>
+    {{ col.label }}
+  </option>
+  {% endfor %}
+</select>
+<div id="panel-status-msg" style="font-family:'Barlow',sans-serif; font-size:12px;
+     color:var(--text-muted); min-height:18px; margin-top:4px;"></div>
+
+<hr class="panel-divider">
+
+<!-- Kommentare -->
+<div class="section-label-sm">KOMMENTARE
+  <span id="comment-count-badge"
+        style="font-family:'JetBrains Mono',monospace; font-size:11px;
+               color:var(--accent-yellow); margin-left:6px;">
+    {{ comments|length }}
+  </span>
+</div>
+
+<div id="comment-thread" style="margin-bottom:12px;">
+  {% for c in comments %}
+  <div class="comment-item">
+    <div class="comment-meta">
+      <span class="comment-author">{{ c.author }}</span>
+      <span class="comment-ts">{{ c.created_at[:16]|replace('T',' ') }}</span>
+    </div>
+    <div class="comment-text">{{ c.text }}</div>
+  </div>
+  {% endfor %}
+  {% if not comments %}
+  <div style="font-family:'Barlow',sans-serif; font-size:13px; color:var(--text-muted);">
+    Noch keine Kommentare.
+  </div>
+  {% endif %}
+</div>
+
+<hr class="panel-divider">
+
+<!-- Kommentar schreiben -->
+<textarea class="comment-form-textarea"
+          id="comment-input"
+          placeholder="Kommentar schreiben …"
+          rows="3"
+          onkeydown="onCommentKeydown(event)"></textarea>
+<div style="margin-top:8px; display:flex; justify-content:flex-end;">
+  <button class="btn-primary"
+          onclick="submitComment({{ applicant.id }})">
+    Senden
+  </button>
+</div>
+
+<script>
+var _panelApplicantId = {{ applicant.id }};
+var _panelPrefix = window._prefix || '';
+
+function onStatusChange(sel) {
+  var newStatus = sel.value;
+  var msg = document.getElementById('panel-status-msg');
+  msg.textContent = 'Speichern…';
+
+  fetch(_panelPrefix + '/kanban/lektorat-mvg/api/applicants/' + _panelApplicantId + '/status', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ new_status: newStatus })
+  }).then(function(r) {
+    if (r.ok) {
+      msg.textContent = 'Gespeichert.';
+      // Karte im Board-Hintergrund aktualisieren
+      var card = document.getElementById('card-' + _panelApplicantId);
+      if (card) {
+        var oldStage = card.dataset.stage;
+        if (oldStage !== newStatus) {
+          var targetBody = document.getElementById('body-' + newStatus);
+          if (targetBody) {
+            targetBody.insertBefore(card, targetBody.firstChild);
+            card.dataset.stage = newStatus;
+            if (window.updateColumnCounts) updateColumnCounts();
+          }
+        }
+      }
+      setTimeout(function() { msg.textContent = ''; }, 2000);
+    } else {
+      msg.style.color = 'var(--status-error)';
+      msg.textContent = 'Fehler – bitte erneut versuchen.';
+    }
+  }).catch(function() {
+    msg.style.color = 'var(--status-error)';
+    msg.textContent = 'Netzwerkfehler.';
+  });
+}
+
+function onCommentKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    submitComment(_panelApplicantId);
+  }
+}
+
+function submitComment(appId) {
+  var input = document.getElementById('comment-input');
+  var text = input.value.trim();
+  if (!text) return;
+
+  fetch(_panelPrefix + '/kanban/lektorat-mvg/api/applicants/' + appId + '/comments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ text: text })
+  }).then(function(r) {
+    if (r.ok) {
+      return r.text();
+    }
+    throw new Error('HTTP ' + r.status);
+  }).then(function(html) {
+    var thread = document.getElementById('comment-thread');
+    // Ersten "Noch keine Kommentare"-Hinweis entfernen
+    var noComments = thread.querySelector('div[style*="Noch keine"]');
+    if (noComments) noComments.remove();
+
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    thread.appendChild(tmp.firstChild);
+    input.value = '';
+
+    // Counter aktualisieren
+    var badge = document.getElementById('comment-count-badge');
+    if (badge) badge.textContent = (parseInt(badge.textContent) || 0) + 1;
+
+    // Karten-Counter im Board aktualisieren
+    var card = document.getElementById('card-' + appId);
+    if (card) {
+      var counter = card.querySelector('.kanban-card__comment-count');
+      if (counter) {
+        var span = counter.querySelector('span, text');
+        counter.innerHTML = counter.innerHTML.replace(/\d+/, function(n) { return parseInt(n)+1; });
+      }
+    }
+  }).catch(function(err) {
+    alert('Fehler beim Senden: ' + err.message);
+  });
+}
+</script>
