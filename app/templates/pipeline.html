@@ -59,6 +59,19 @@
     {% endfor %}
     {% if active_filters | length >= 2 %}<span class="filter-count">{{ active_filters | length }} aktiv</span>{% endif %}
     <button class="filter-reset" {% if not active_filters %}style="display:none"{% endif %} onclick="resetFilters()" type="button">Alle anzeigen</button>
+    <!-- STORY-6: Owner-Filter Chips -->
+    <span style="color:#383838; margin:0 8px; line-height:1; align-self:center;">|</span>
+    {% if owners %}
+    {% for owner in owners %}
+    <button class="owner-chip {% if owner.key == active_owner %}is-active{% endif %}"
+            onclick="setOwnerFilter('{{ owner.key }}')"
+            type="button"
+            title="{{ owner.label }}">
+      <span class="oc-avatar">{{ owner.initials }}</span>
+      <span class="oc-label">{{ owner.label }}</span>
+    </button>
+    {% endfor %}
+    {% endif %}
   </div>
 </div>
 <div style="height:16px;"></div>
@@ -85,9 +98,33 @@
       {% elif stage == 'proposal_sent' %}#5870E2
       {% else %}#555{% endif %}; margin-bottom:2px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <span style="font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#F0F0F0;">
-          {{ stage_labels[stage] }}
-        </span>
+        <!-- STORY-5: Stage-Label + Info-Icon mit Tooltip -->
+        <div class="stage-info-wrapper" style="display:flex; align-items:center; gap:0; position:relative;">
+          <span style="font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#F0F0F0;">
+            {{ stage_labels[stage] }}
+          </span>
+          {%- if stage_defs_map and stage in stage_defs_map %}
+          {%- set sdef = stage_defs_map[stage] %}
+          <span class="stage-info-trigger" style="display:inline-flex; align-items:center; margin-left:6px; position:relative;"
+                onmouseenter="showStageTooltip(this)"
+                onmouseleave="hideStageTooltip(this)"
+                ontouchstart="toggleStageTooltip(event, this)">
+            <svg class="stage-info-icon" width="14" height="14" viewBox="0 0 16 16"
+                 fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+              <rect x="7.25" y="7" width="1.5" height="5" rx="0.5" fill="currentColor"/>
+              <rect x="7.25" y="4.5" width="1.5" height="1.5" rx="0.5" fill="currentColor"/>
+            </svg>
+            <div class="stage-tooltip" role="tooltip">
+              <div class="st-name">{{ sdef.display_name }}</div>
+              <div class="st-def">{{ sdef.definition }}</div>
+              {%- if sdef.required_fields %}
+              <div class="st-fields">{{ sdef.required_fields }}</div>
+              {%- endif %}
+            </div>
+          </span>
+          {%- endif %}
+        </div>
         {%- if stage not in ('won', 'lost') %}
         <a href="{{ prefix }}/deals/new?stage={{ stage }}"
            title="Neuer Deal in {{ stage_labels[stage] }}"
@@ -237,6 +274,116 @@
 .cvr-data-note-tooltip.is-visible {
   opacity: 1 !important;
   transform: translateY(0) !important;
+}
+</style>
+
+<!-- STORY-5: Stage-Info-Icon + Tooltip CSS -->
+<style>
+.stage-info-icon {
+  color: #555;
+  transition: color 0.15s ease;
+  cursor: default;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.stage-info-wrapper:hover .stage-info-icon,
+.stage-info-trigger:hover .stage-info-icon {
+  color: #FFFB76;
+}
+.stage-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  max-width: 280px;
+  background: #2a2a2a;
+  border: 1px solid #383838;
+  border-radius: 4px;
+  padding: 10px 14px;
+  pointer-events: none;
+  z-index: 500;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 120ms ease-out, transform 120ms ease-out;
+  white-space: normal;
+  text-align: left;
+}
+.stage-tooltip.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.st-name {
+  font-family: 'Barlow', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #FFFB76;
+  margin-bottom: 5px;
+}
+.st-def {
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  color: #aaa;
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+.st-fields {
+  font-size: 10px;
+  color: #666;
+  line-height: 1.4;
+}
+</style>
+
+<!-- STORY-6: Owner-Filter Chip CSS -->
+<style>
+.owner-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 6px;
+  border: 1px solid #383838;
+  border-radius: 20px;
+  background: transparent;
+  color: #999;
+  font-family: 'Barlow', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.owner-chip:hover {
+  border-color: #777;
+  color: #E8E8E8;
+}
+.owner-chip.is-active {
+  border-color: #FFFB76;
+  color: #FFFB76;
+  background: rgba(255,251,118,0.08);
+}
+.owner-chip .oc-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #383838;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: #aaa;
+  flex-shrink: 0;
+}
+.owner-chip.is-active .oc-avatar {
+  background: rgba(255,251,118,0.2);
+  color: #FFFB76;
+}
+/* Mobile < 768px: nur Avatar-Circle, kein Text */
+@media (max-width: 767px) {
+  .owner-chip .oc-label { display: none; }
+  .owner-chip { padding: 4px 6px; }
+  #product-filter-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 </style>
 {% endblock %}
@@ -1101,6 +1248,68 @@ if (svInput) {
   svInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); saveSavedView(); }
   });
+}
+</script>
+
+<!-- STORY-5: Stage-Info-Tooltip JS (hover + touch) -->
+<script>
+function showStageTooltip(trigger) {
+  var tooltip = trigger.querySelector('.stage-tooltip');
+  if (tooltip) tooltip.classList.add('is-visible');
+}
+function hideStageTooltip(trigger) {
+  var tooltip = trigger.querySelector('.stage-tooltip');
+  if (tooltip) tooltip.classList.remove('is-visible');
+}
+function toggleStageTooltip(e, trigger) {
+  e.preventDefault();
+  var tooltip = trigger.querySelector('.stage-tooltip');
+  if (!tooltip) return;
+  var isVisible = tooltip.classList.contains('is-visible');
+  // Close all other open tooltips first
+  document.querySelectorAll('.stage-tooltip.is-visible').forEach(function(t) {
+    t.classList.remove('is-visible');
+  });
+  if (!isVisible) {
+    tooltip.classList.add('is-visible');
+  }
+}
+// Touch: tap anywhere outside closes open stage tooltips
+document.addEventListener('touchstart', function(e) {
+  if (!e.target.closest('.stage-info-trigger')) {
+    document.querySelectorAll('.stage-tooltip.is-visible').forEach(function(t) {
+      t.classList.remove('is-visible');
+    });
+  }
+}, { passive: true });
+</script>
+
+<!-- STORY-6: Owner-Filter JS (localStorage sticky + URL-Navigation) -->
+<script>
+var OWNER_KEY = 'crm_pipeline_owner_filter';
+
+// Beim Seitenload: Wenn kein ?owner= in URL, gespeicherten Wert aus localStorage anwenden
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  if (!params.has('owner')) {
+    var saved = localStorage.getItem(OWNER_KEY);
+    if (saved && saved !== 'alle') {
+      params.set('owner', saved);
+      window.location.replace(window.location.pathname + '?' + params.toString());
+    }
+  }
+})();
+
+function setOwnerFilter(ownerKey) {
+  localStorage.setItem(OWNER_KEY, ownerKey);
+  var params = new URLSearchParams(window.location.search);
+  if (ownerKey === 'alle') {
+    params.delete('owner');
+  } else {
+    params.set('owner', ownerKey);
+  }
+  params.set('page', '1');
+  window.location.href = window.location.pathname + '?' + params.toString();
 }
 </script>
 {% endblock %}

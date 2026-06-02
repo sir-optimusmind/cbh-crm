@@ -91,6 +91,18 @@ def _build_filter_url(active_filters: list, toggled_product: str) -> str:
 
 # ─── GET /pipeline ─────────────────────────────────────────────────────────────
 
+# STORY-6: Owner-Map fuer Filter-UI (Chip-Labels + Initialen)
+OWNERS = [
+    {"key": "alle",      "label": "Alle",     "initials": "—"},
+    {"key": "christian", "label": "Christian","initials": "CH"},
+    {"key": "andre",     "label": "André",    "initials": "AN"},
+    {"key": "marco",     "label": "Marco",    "initials": "MA"},
+    {"key": "michi",     "label": "Michi",    "initials": "MI"},
+    {"key": "tim",       "label": "Tim",      "initials": "TI"},
+]
+VALID_OWNER_KEYS = {o["key"] for o in OWNERS}
+
+
 @router.get("/pipeline", response_class=HTMLResponse)
 async def pipeline_kanban(request: Request):
     prefix = request.scope.get("root_path", "")
@@ -103,14 +115,19 @@ async def pipeline_kanban(request: Request):
     # CRM-053: Multi-Produkt-Filter
     active_filters = request.query_params.getlist("produkt")
 
+    # STORY-6: Owner-Filter (?owner=marco) – default: alle
+    active_owner = request.query_params.get("owner", "alle")
+    if active_owner not in VALID_OWNER_KEYS:
+        active_owner = "alle"
+
     if view_mode == "table":
-        return await _pipeline_table_view(request, prefix, active_filters)
+        return await _pipeline_table_view(request, prefix, active_filters, active_owner)
     else:
-        return await _pipeline_kanban_view(request, prefix, active_filters, view_mode)
+        return await _pipeline_kanban_view(request, prefix, active_filters, view_mode, active_owner)
 
 
-async def _pipeline_kanban_view(request: Request, prefix: str, active_filters: list, view_mode: str):
-    """CRM-011 + CRM-053: Kanban-Ansicht mit optionalem Produkt-Filter."""
+async def _pipeline_kanban_view(request: Request, prefix: str, active_filters: list, view_mode: str, active_owner: str = "alle"):
+    """CRM-011 + CRM-053 + STORY-6: Kanban-Ansicht mit Produkt- und Owner-Filter."""
     conn = get_connection()
     try:
         # Basis-Query
@@ -130,6 +147,11 @@ async def _pipeline_kanban_view(request: Request, prefix: str, active_filters: l
                 SELECT deal_id FROM deal_product WHERE product IN ({placeholders})
             )"""
             params.extend(active_filters)
+
+        # STORY-6: Owner-Filter – bei 'alle' kein Filter, sonst WHERE d.owner = ?
+        if active_owner and active_owner != "alle":
+            base_sql += " AND d.owner = ?"
+            params.append(active_owner)
 
         base_sql += """ ORDER BY
                  CASE d.stage
@@ -191,6 +213,19 @@ async def _pipeline_kanban_view(request: Request, prefix: str, active_filters: l
         stages_data["won"]["ytd_label"] = True
         stages_data["lost"]["cvr"] = None
 
+        # STORY-5: Stage-Definitionen fuer Tooltips aus bestehender stage_definition-Tabelle
+        stage_def_rows = conn.execute(
+            "SELECT stage, label, trigger_condition, notes FROM stage_definition"
+        ).fetchall()
+        stage_defs_map = {
+            row["stage"]: {
+                "display_name": row["label"],
+                "definition":   row["trigger_condition"],
+                "required_fields": row["notes"] or "",
+            }
+            for row in stage_def_rows
+        }
+
     finally:
         conn.close()
 
@@ -219,14 +254,19 @@ async def _pipeline_kanban_view(request: Request, prefix: str, active_filters: l
         "products_filter": PRODUCTS_FILTER,
         "build_filter_url": build_filter_url,
         "saved_views": saved_views,
+        # STORY-5: Stage-Definitionen fuer Tooltips
+        "stage_defs_map": stage_defs_map,
+        # STORY-6: Owner-Filter
+        "owners": OWNERS,
+        "active_owner": active_owner,
         # CRM-066: Google Drive Picker Vars fuer Template-JS
         "google_picker_api_key": GOOGLE_PICKER_API_KEY,
         "google_project_number": GOOGLE_PROJECT_NUMBER,
     }))
 
 
-async def _pipeline_table_view(request: Request, prefix: str, active_filters: list):
-    """CRM-052: Tabellen-Ansicht mit Sort + Pagination."""
+async def _pipeline_table_view(request: Request, prefix: str, active_filters: list, active_owner: str = "alle"):
+    """CRM-052 + STORY-6: Tabellen-Ansicht mit Sort + Pagination + Owner-Filter."""
     sort_field = request.query_params.get("sort", "created_at")
     sort_dir = request.query_params.get("dir", "desc")
     page = max(1, int(request.query_params.get("page", "1")))
@@ -255,6 +295,11 @@ async def _pipeline_table_view(request: Request, prefix: str, active_filters: li
             )"""
             count_params.extend(active_filters)
 
+        # STORY-6: Owner-Filter in Tabellen-Ansicht
+        if active_owner and active_owner != "alle":
+            count_sql += " AND d.owner = ?"
+            count_params.append(active_owner)
+
         total = conn.execute(count_sql, count_params).fetchone()["cnt"]
 
         # Daten-Query
@@ -273,6 +318,11 @@ async def _pipeline_table_view(request: Request, prefix: str, active_filters: li
                 SELECT deal_id FROM deal_product WHERE product IN ({placeholders})
             )"""
             data_params.extend(active_filters)
+
+        # STORY-6: Owner-Filter
+        if active_owner and active_owner != "alle":
+            data_sql += " AND d.owner = ?"
+            data_params.append(active_owner)
 
         data_sql += f" ORDER BY {sql_sort} {sort_dir.upper()} NULLS LAST"
         data_sql += f" LIMIT {PAGE_SIZE} OFFSET {(page-1)*PAGE_SIZE}"
@@ -311,6 +361,9 @@ async def _pipeline_table_view(request: Request, prefix: str, active_filters: li
         "filter_params": filter_params,
         "view_mode": "table",
         "build_filter_url": lambda p: _build_filter_url(active_filters, p),
+        # STORY-6: Owner-Filter
+        "owners": OWNERS,
+        "active_owner": active_owner,
     }))
 
 
