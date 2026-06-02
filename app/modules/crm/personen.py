@@ -25,6 +25,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.db import get_connection, write_audit_log, now_iso
 from app.template_utils import tmpl_ctx
+from app.shared.templating import _get_current_user
 
 _EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -115,9 +116,15 @@ def personen_liste(
     letzter_kontakt: str = "",
 ):
     prefix = request.scope.get("root_path", "")
-    # Derive short owner name from logged-in user (e.g. christian@cbh.ai -> christian)
-    raw_user = get_user(request)
-    current_user_owner = raw_user.split("@")[0] if "@" in raw_user else raw_user
+    # Derive short owner name from logged-in user via Session (Google OAuth).
+    # Fallback: X-Forwarded-User header (Basic Auth legacy).
+    session_user = _get_current_user(request)
+    session_email = session_user.get("email", "")
+    if session_email:
+        current_user_owner = session_email.split("@")[0]
+    else:
+        raw_user = get_user(request)
+        current_user_owner = raw_user.split("@")[0] if "@" in raw_user else raw_user
     conn = get_connection()
     try:
         sql = "SELECT p.* FROM person p WHERE p.deleted_at IS NULL"
