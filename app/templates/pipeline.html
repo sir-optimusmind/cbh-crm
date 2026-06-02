@@ -110,11 +110,36 @@
         <span>€{{ "{:,.0f}".format(sd.acv_sum) }}</span>
         {% endif %}
       </div>
-      {# CRM-056: Historische CVR aus deal_stage_history #}
+      {# CRM-056 / BUG-B: CVR aus deal_stage_history, Cohort-Nenner A2 #}
       {% if stage not in ('won', 'lost') %}
-      <div style="font-size:11px; margin-top:2px;"
+      <div style="font-size:11px; margin-top:2px; display:flex; align-items:center; gap:4px;"
            class="{{ sd.cvr_class if sd.cvr_class else 'funnel-cvr--empty' }}">
         {% if sd.cvr is not none %}CVR → {{ sd.cvr }}%{% else %}CVR –{% endif %}
+        {% if sd.cvr_low_data %}
+        <span style="position:relative; display:inline-block; vertical-align:middle;">
+          <svg width="12" height="12" viewBox="0 0 16 16"
+               fill="none" xmlns="http://www.w3.org/2000/svg"
+               style="color:#666; cursor:default; vertical-align:middle; transition:color 0.15s ease;"
+               onmouseenter="this.nextElementSibling.classList.add('is-visible'); this.style.color='#FFFB76';"
+               onmouseleave="this.nextElementSibling.classList.remove('is-visible'); this.style.color='#666';">
+            <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="7.25" y="7" width="1.5" height="5" rx="0.5" fill="currentColor"/>
+            <rect x="7.25" y="4.5" width="1.5" height="1.5" rx="0.5" fill="currentColor"/>
+          </svg>
+          <div class="cvr-data-note-tooltip"
+               role="tooltip"
+               style="position:absolute; bottom:calc(100% + 6px); left:0;
+                      min-width:200px; max-width:240px;
+                      background:#2a2a2a; border:1px solid #383838; border-radius:4px;
+                      padding:9px 12px; pointer-events:none; z-index:600;
+                      opacity:0; transition:opacity 120ms ease-out, transform 120ms ease-out;
+                      transform:translateY(4px);
+                      font-family:'Barlow',sans-serif; font-size:11px; color:#aaa; line-height:1.5;
+                      white-space:normal; text-align:left;">
+            Diese Rate basiert auf einer kleinen Datenbasis – es gibt noch keine Lost-Übergänge in dieser Stage.
+          </div>
+        </span>
+        {% endif %}
       </div>
       {% endif %}
     </div>
@@ -206,6 +231,14 @@
 <div style="margin-top:16px; text-align:right;">
   <a href="{{ prefix }}/pipeline/stages" style="color:#aaa; font-size:12px; text-decoration:none;">ℹ Stage-Definitionen ansehen</a>
 </div>
+
+<!-- BUG-B: CVR low-data-flag Tooltip CSS -->
+<style>
+.cvr-data-note-tooltip.is-visible {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+</style>
 {% endblock %}
 {% block scripts %}
 

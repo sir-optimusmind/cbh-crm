@@ -27,7 +27,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.db import get_connection, write_audit_log, now_iso
 from app.template_utils import tmpl_ctx
-from app.shared.cvr import get_cvr_matrix, cvr_pct, get_cvr_label_class, invalidate_cvr_cache
+from app.shared.cvr import get_cvr_matrix, cvr_pct, cvr_entry, get_cvr_label_class, invalidate_cvr_cache
 
 router = APIRouter()
 _TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
@@ -175,14 +175,17 @@ async def _pipeline_kanban_view(request: Request, prefix: str, active_filters: l
                     "acv_sum": acv_sum,
                 }
 
-        # CRM-056: Historische CVR aus deal_stage_history (Niko N2, direkter Uebergang)
+        # CRM-056 / BUG-B: CVR aus deal_stage_history, Cohort-Nenner (A2-Fix Sprint 5)
         cvr_matrix = get_cvr_matrix()
         active_stages = ["opportunity", "new", "discovery", "proposal_sent"]
         for i, stage in enumerate(active_stages):
             next_stage = active_stages[i + 1] if i + 1 < len(active_stages) else "won"
-            rate = cvr_pct(stage, next_stage)
+            entry = cvr_entry(stage, next_stage)
+            rate = entry.get("rate_pct")
             stages_data[stage]["cvr"] = rate
             stages_data[stage]["cvr_class"] = get_cvr_label_class(rate)
+            stages_data[stage]["cvr_low_data"] = entry.get("low_data_flag", False)
+            stages_data[stage]["cvr_total_in"] = entry.get("total_in", 0)
 
         stages_data["won"]["cvr"] = None
         stages_data["won"]["ytd_label"] = True
@@ -441,15 +444,24 @@ async def pipeline_funnel(request: Request):
     finally:
         conn.close()
 
-    # CVR-Matrix (aus Cache)
+    # CVR-Matrix (aus Cache) – BUG-B: Cohort-Nenner A2-Fix
     cvr_matrix = get_cvr_matrix()
 
     # Stages fuer Funnel aufbauen
     funnel_stages = []
-    for i, stage in enumerate(["opportunity", "new", "discovery", "proposal_sent", "won"]):
+    _funnel_order = ["opportunity", "new", "discovery", "proposal_sent", "won"]
+    for i, stage in enumerate(_funnel_order):
         stage_info = stage_counts.get(stage, {"count": 0, "vol": 0})
-        next_stage = ["opportunity", "new", "discovery", "proposal_sent", "won"][i+1] if i < 4 else None
-        rate = cvr_pct(stage, next_stage) if next_stage else None
+        next_stage = _funnel_order[i + 1] if i < len(_funnel_order) - 1 else None
+        if next_stage:
+            entry = cvr_entry(stage, next_stage)
+            rate = entry.get("rate_pct")
+            low_data = entry.get("low_data_flag", False)
+            total_in = entry.get("total_in", 0)
+        else:
+            rate = None
+            low_data = False
+            total_in = 0
         funnel_stages.append({
             "stage": stage,
             "label": stage.replace("_", " ").title(),
@@ -459,6 +471,8 @@ async def pipeline_funnel(request: Request):
             "cvr_to_next": rate,
             "cvr_class": get_cvr_label_class(rate),
             "next_stage": next_stage,
+            "cvr_low_data": low_data,
+            "cvr_total_in": total_in,
         })
 
     return templates.TemplateResponse(request, "pipeline_funnel.html", tmpl_ctx(request, {
