@@ -133,7 +133,8 @@ def personen_liste(
             sql += " AND (p.vorname || ' ' || p.nachname LIKE ? OR p.email LIKE ?)"
             params += [f"%{q}%", f"%{q}%"]
         # owner=__me__ resolves to the logged-in user's short name
-        effective_owner = current_user_owner if owner == "__me__" else owner
+        # owner=alle means no filter → effective_owner="" skips the WHERE clause below
+        effective_owner = current_user_owner if owner == "__me__" else (owner if owner != "alle" else "")
         if effective_owner:
             sql += " AND p.created_by = ?"
             params.append(effective_owner)
