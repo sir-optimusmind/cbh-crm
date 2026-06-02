@@ -3,24 +3,30 @@
 {% block content %}
 <div id="funnel-page" style="background:var(--bg-base,#1E1E1E); min-height:100vh; padding:0;">
 
-  <!-- Page-Header -->
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px;">
-    <div>
-      <h1 style="font-size:20px; font-weight:700; margin:0 0 4px 0; color:#E5E7EB; font-family:'Barlow Semi Condensed',sans-serif; text-transform:uppercase; letter-spacing:0.08em;">Funnel Report</h1>
-      <div style="font-size:12px; color:#6B7280;">CRM-057 | Conversion-Rates aus echter Stage-History</div>
+  <!-- Page-Header (BUG-S6-001: Owner-Filter ergaenzt) -->
+  <div style="margin-bottom:16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+      <div>
+        <h1 style="font-size:20px; font-weight:700; margin:0 0 4px 0; color:#E5E7EB; font-family:'Barlow Semi Condensed',sans-serif; text-transform:uppercase; letter-spacing:0.08em;">Funnel Report</h1>
+        <div style="font-size:12px; color:#6B7280;">CRM-057 | Conversion-Rates aus echter Stage-History</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <!-- Zeitraum-Filter: owner-Param beibehalten (BUG-S6-001) -->
+        <select class="select-input" name="zeitraum"
+                onchange="(function(v){ var p=new URLSearchParams(window.location.search); p.set('zeitraum',v); window.location.href='{{ prefix }}/pipeline/funnel?'+p.toString(); })(this.value)"
+                style="font-size:12px; padding:6px 10px; background:#252525; border:1px solid #374151; border-radius:6px; color:#E5E7EB; cursor:pointer;">
+          <option value="all"  {% if zeitraum=='all'  %}selected{% endif %}>Gesamt</option>
+          <option value="30d"  {% if zeitraum=='30d'  %}selected{% endif %}>Letzte 30 Tage</option>
+          <option value="90d"  {% if zeitraum=='90d'  %}selected{% endif %}>Letzte 90 Tage</option>
+          <option value="q1"   {% if zeitraum=='q1'   %}selected{% endif %}>Q1 2026</option>
+          <option value="q2"   {% if zeitraum=='q2'   %}selected{% endif %}>Q2 2026</option>
+        </select>
+        <a href="{{ prefix }}/pipeline" class="btn-secondary btn-sm">&larr; Pipeline</a>
+      </div>
     </div>
-    <div style="display:flex; align-items:center; gap:12px;">
-      <!-- Zeitraum-Filter -->
-      <select class="select-input" name="zeitraum"
-              onchange="window.location.href='{{ prefix }}/pipeline/funnel?zeitraum=' + this.value"
-              style="font-size:12px; padding:6px 10px; background:#252525; border:1px solid #374151; border-radius:6px; color:#E5E7EB; cursor:pointer;">
-        <option value="all"  {% if zeitraum=='all'  %}selected{% endif %}>Gesamt</option>
-        <option value="30d"  {% if zeitraum=='30d'  %}selected{% endif %}>Letzte 30 Tage</option>
-        <option value="90d"  {% if zeitraum=='90d'  %}selected{% endif %}>Letzte 90 Tage</option>
-        <option value="q1"   {% if zeitraum=='q1'   %}selected{% endif %}>Q1 2026</option>
-        <option value="q2"   {% if zeitraum=='q2'   %}selected{% endif %}>Q2 2026</option>
-      </select>
-      <a href="{{ prefix }}/pipeline" class="btn-secondary btn-sm">&larr; Pipeline</a>
+    <!-- STORY-6 BUG-S6-001: Owner-Filter-Chips (Partial) -->
+    <div class="filter-bar" id="product-filter-bar" style="padding:8px 0; border-bottom:1px solid #1F2937; flex-wrap:wrap; gap:6px; display:flex; align-items:center;">
+      {% include "_owner_filter_chips.html" %}
     </div>
   </div>
 

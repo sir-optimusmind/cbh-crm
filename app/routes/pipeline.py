@@ -433,9 +433,14 @@ async def pipeline_lost_all(request: Request):
 
 @router.get("/pipeline/funnel", response_class=HTMLResponse)
 async def pipeline_funnel(request: Request):
-    """CRM-057: Funnel-Report-Page mit CVR, Verweildauer, Lost-Breakdown."""
+    """CRM-057 + BUG-S6-001: Funnel-Report-Page mit CVR, Verweildauer, Lost-Breakdown + Owner-Filter."""
     prefix = request.scope.get("root_path", "")
     zeitraum = request.query_params.get("zeitraum", "all")
+
+    # BUG-S6-001 STORY-6: Owner-Filter analog Kanban-Route
+    active_owner = request.query_params.get("owner", "alle")
+    if active_owner not in VALID_OWNER_KEYS:
+        active_owner = "alle"
 
     conn = get_connection()
     try:
@@ -445,10 +450,13 @@ async def pipeline_funnel(request: Request):
         ).fetchone()["cnt"]
         has_history_data = history_count >= 5
 
-        # Deal-Counts pro Stage
+        # BUG-S6-001: Deal-Counts pro Stage mit optionalem Owner-Filter
+        owner_clause = " AND owner = ?" if active_owner != "alle" else ""
+        owner_params = [active_owner] if active_owner != "alle" else []
         stage_rows = conn.execute(
-            """SELECT stage, COUNT(*) as cnt, COALESCE(SUM(acv),0) as vol
-               FROM deal WHERE deleted_at IS NULL GROUP BY stage"""
+            f"""SELECT stage, COUNT(*) as cnt, COALESCE(SUM(acv),0) as vol
+               FROM deal WHERE deleted_at IS NULL{owner_clause} GROUP BY stage""",
+            owner_params
         ).fetchall()
         stage_counts = {r["stage"]: {"count": r["cnt"], "vol": r["vol"]} for r in stage_rows}
 
@@ -463,7 +471,15 @@ async def pipeline_funnel(request: Request):
         elif zeitraum == "q2":
             ts_filter = "AND moved_at >= '2026-04-01' AND moved_at < '2026-07-01'"
 
-        # Durchschnittliche Verweildauer pro Stage
+        # Durchschnittliche Verweildauer pro Stage (BUG-S6-001: Owner-Filter via JOIN)
+        dwell_owner_join = ""
+        dwell_owner_filter = ""
+        dwell_params = []
+        if active_owner != "alle":
+            dwell_owner_join = " JOIN deal d ON d.id = h1.deal_id"
+            dwell_owner_filter = " AND d.owner = ?"
+            dwell_params.append(active_owner)
+
         dwell_rows = conn.execute(f"""
             SELECT h1.from_stage as stage,
                    AVG(julianday(h2.moved_at) - julianday(h1.moved_at)) as avg_days
@@ -472,17 +488,18 @@ async def pipeline_funnel(request: Request):
                 AND h2.id = (
                     SELECT MIN(id) FROM deal_stage_history
                     WHERE deal_id = h1.deal_id AND id > h1.id
-                )
-            WHERE h1.from_stage IS NOT NULL {ts_filter}
+                ){dwell_owner_join}
+            WHERE h1.from_stage IS NOT NULL {ts_filter}{dwell_owner_filter}
             GROUP BY h1.from_stage
-        """).fetchall()
+        """, dwell_params).fetchall()
         dwell = {r["stage"]: round(r["avg_days"], 0) if r["avg_days"] else None for r in dwell_rows}
 
-        # Lost-Breakdown nach verlust_reason_enum
+        # Lost-Breakdown nach verlust_reason_enum (BUG-S6-001: Owner-Filter)
         lost_enum_rows = conn.execute(
-            """SELECT verlust_reason_enum, COUNT(*) as cnt
-               FROM deal WHERE stage='lost' AND deleted_at IS NULL
-               GROUP BY verlust_reason_enum ORDER BY cnt DESC"""
+            f"""SELECT verlust_reason_enum, COUNT(*) as cnt
+               FROM deal WHERE stage='lost' AND deleted_at IS NULL{owner_clause}
+               GROUP BY verlust_reason_enum ORDER BY cnt DESC""",
+            owner_params
         ).fetchall()
         total_lost = sum(r["cnt"] for r in lost_enum_rows)
         lost_reasons = []
@@ -538,6 +555,9 @@ async def pipeline_funnel(request: Request):
         "total_lost": total_lost,
         "zeitraum": zeitraum,
         "stage_counts": stage_counts,
+        # BUG-S6-001 STORY-6: Owner-Filter Context
+        "owners": OWNERS,
+        "active_owner": active_owner,
     }))
 
 

@@ -1,0 +1,104 @@
+{#
+  _owner_filter_chips.html – STORY-6 BUG-S6-001
+  Shared partial: Owner-Filter-Chip-Reihe fuer Kanban + Funnel.
+  Erwartet im Template-Kontext: owners (list), active_owner (str)
+  JS: setOwnerFilter() + localStorage-IIFE (Single Source hier)
+#}
+
+<!-- STORY-6: Owner-Filter Chips -->
+<span style="color:#383838; margin:0 8px; line-height:1; align-self:center;">|</span>
+{% if owners %}
+{% for owner in owners %}
+<button class="owner-chip {% if owner.key == active_owner %}is-active{% endif %}"
+        onclick="setOwnerFilter('{{ owner.key }}')"
+        type="button"
+        title="{{ owner.label }}">
+  <span class="oc-avatar">{{ owner.initials }}</span>
+  <span class="oc-label">{{ owner.label }}</span>
+</button>
+{% endfor %}
+{% endif %}
+
+<!-- STORY-6: Owner-Filter CSS (eingebettet damit das Partial standalone funktioniert) -->
+<style>
+.owner-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 6px;
+  border: 1px solid #383838;
+  border-radius: 20px;
+  background: transparent;
+  color: #999;
+  font-family: 'Barlow', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.owner-chip:hover {
+  border-color: #777;
+  color: #E8E8E8;
+}
+.owner-chip.is-active {
+  border-color: #FFFB76;
+  color: #FFFB76;
+  background: rgba(255,251,118,0.08);
+}
+.owner-chip .oc-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #383838;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: #aaa;
+  flex-shrink: 0;
+}
+.owner-chip.is-active .oc-avatar {
+  background: rgba(255,251,118,0.2);
+  color: #FFFB76;
+}
+/* Mobile < 768px: nur Avatar-Circle, kein Text */
+@media (max-width: 767px) {
+  .owner-chip .oc-label { display: none; }
+  .owner-chip { padding: 4px 6px; }
+}
+</style>
+
+<!-- STORY-6: Owner-Filter JS (localStorage sticky + URL-Navigation) -->
+<script>
+(function() {
+  // Verhindert Doppel-Init wenn beide Templates auf derselben Seite landen
+  if (window.__ownerFilterInitialized) return;
+  window.__ownerFilterInitialized = true;
+
+  var OWNER_KEY = 'crm_pipeline_owner_filter';
+
+  // Beim Seitenload: kein ?owner= in URL -> gespeicherten Wert aus localStorage anwenden
+  var params = new URLSearchParams(window.location.search);
+  if (!params.has('owner')) {
+    var saved = localStorage.getItem(OWNER_KEY);
+    if (saved && saved !== 'alle') {
+      params.set('owner', saved);
+      window.location.replace(window.location.pathname + '?' + params.toString());
+    }
+  }
+
+  window.setOwnerFilter = function(ownerKey) {
+    localStorage.setItem(OWNER_KEY, ownerKey);
+    var p = new URLSearchParams(window.location.search);
+    if (ownerKey === 'alle') {
+      p.delete('owner');
+    } else {
+      p.set('owner', ownerKey);
+    }
+    p.set('page', '1');
+    window.location.href = window.location.pathname + '?' + p.toString();
+  };
+})();
+</script>
